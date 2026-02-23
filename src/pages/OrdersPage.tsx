@@ -1,0 +1,200 @@
+import { useState } from 'react';
+import { Search, Filter, ChevronDown, Plus, Edit, Archive, Eye, Calendar, Clock } from 'lucide-react';
+import { useApi } from '../hooks/useApi';
+import { useToast } from '../components/Toast';
+import Modal, { FormField, BtnPrimary, BtnSecondary, BtnDanger } from '../components/Modal';
+import ConfirmDialog from '../components/ConfirmDialog';
+import { workOrders as fallbackOrders, technicians as fallbackTechs } from '../data/mock';
+
+interface WorkOrder {
+    id: string; title: string; client: string; clientAddress: string;
+    technicianId: string; status: string; priority: string;
+    scheduledDate: string; estimatedDuration: string; projectId?: string; description: string;
+}
+interface Tech { id: string; name: string; avatar: string; }
+
+const statusMap: Record<string, { label: string; cls: string }> = {
+    'pendiente': { label: 'Pendiente', cls: 'badge-pending' },
+    'en-progreso': { label: 'En Progreso', cls: 'badge-progress' },
+    'completada': { label: 'Completada', cls: 'badge-completed' },
+    'cancelada': { label: 'Cancelada', cls: 'badge-cancelled' },
+};
+const priorityColors: Record<string, { bg: string; color: string }> = {
+    'urgente': { bg: 'rgba(239,68,68,0.12)', color: '#f87171' },
+    'alta': { bg: 'rgba(239,68,68,0.12)', color: '#f87171' },
+    'media': { bg: 'rgba(245,158,11,0.12)', color: '#fbbf24' },
+    'baja': { bg: 'rgba(16,185,129,0.12)', color: '#34d399' },
+};
+
+const emptyOrder: Partial<WorkOrder> = {
+    title: '', client: '', clientAddress: '', technicianId: '', status: 'pendiente',
+    priority: 'media', scheduledDate: '', estimatedDuration: '2h', description: '',
+};
+
+export default function OrdersPage() {
+    const { data: orders, refetch } = useApi<WorkOrder[]>('/api/work-orders', fallbackOrders as any);
+    const { data: techs } = useApi<Tech[]>('/api/technicians', fallbackTechs as any);
+    const { toast } = useToast();
+
+    const [search, setSearch] = useState('');
+    const [statusFilter, setStatusFilter] = useState('all');
+    const [selected, setSelected] = useState<WorkOrder | null>(null);
+    const [modal, setModal] = useState<'create' | 'edit' | null>(null);
+    const [form, setForm] = useState<Partial<WorkOrder>>(emptyOrder);
+    const [archiveId, setArchiveId] = useState<string | null>(null);
+
+    const filtered = orders.filter(o => {
+        const matchSearch = search === '' || o.title.toLowerCase().includes(search.toLowerCase()) || o.client.toLowerCase().includes(search.toLowerCase()) || o.id.toLowerCase().includes(search.toLowerCase());
+        const matchStatus = statusFilter === 'all' || o.status === statusFilter;
+        return matchSearch && matchStatus;
+    });
+
+    const getTechName = (id: string) => techs.find(t => t.id === id)?.name || id;
+    const set = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }));
+
+    const handleSave = async () => {
+        const isNew = modal === 'create';
+        const id = isNew ? `OT-${String(Date.now()).slice(-4)}` : form.id;
+        const body = { ...form, id };
+        const res = await fetch(isNew ? '/api/work-orders' : `/api/work-orders/${id}`, {
+            method: isNew ? 'POST' : 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+        });
+        if (res.ok) {
+            toast('success', isNew ? 'Orden de trabajo creada' : 'Orden actualizada');
+            setModal(null); setSelected(null); refetch();
+        } else toast('error', 'Error al guardar');
+    };
+
+    const handleArchive = async (id: string) => {
+        const res = await fetch(`/api/work-orders/${id}`, { method: 'DELETE' });
+        if (res.ok) { toast('success', 'Orden archivada'); refetch(); }
+        else toast('error', 'Error al archivar');
+    };
+
+    return (
+        <div style={{ display: 'flex', gap: 20, height: 'calc(100vh - 108px)' }}>
+            {/* Main list */}
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
+                    <div>
+                        <h1 style={{ fontSize: 24, fontWeight: 700, letterSpacing: '-0.02em' }}>Órdenes de Trabajo</h1>
+                        <p style={{ fontSize: 14, color: 'var(--color-geo-text-muted)', marginTop: 4 }}>{filtered.length} órdenes</p>
+                    </div>
+                    <button onClick={() => { setForm(emptyOrder); setModal('create'); }} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 20px', borderRadius: 10, border: 'none', fontSize: 13, fontWeight: 600, background: 'var(--color-geo-primary)', color: '#fff', cursor: 'pointer' }}>
+                        <Plus size={16} /> Nueva OT
+                    </button>
+                </div>
+
+                <div style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
+                    <div style={{ flex: 1, position: 'relative' }}>
+                        <Search size={16} style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: 'var(--color-geo-text-dim)' }} />
+                        <input className="geo-input" placeholder="Buscar OT..." value={search} onChange={e => setSearch(e.target.value)} style={{ width: '100%', paddingLeft: 40 }} />
+                    </div>
+                    <div style={{ position: 'relative' }}>
+                        <Filter size={16} style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: 'var(--color-geo-text-dim)', pointerEvents: 'none' }} />
+                        <select className="geo-input" value={statusFilter} onChange={e => setStatusFilter(e.target.value)} style={{ paddingLeft: 40, paddingRight: 30, appearance: 'none', cursor: 'pointer', minWidth: 150 }}>
+                            <option value="all">Todos</option>
+                            <option value="pendiente">Pendiente</option>
+                            <option value="en-progreso">En Progreso</option>
+                            <option value="completada">Completada</option>
+                            <option value="cancelada">Cancelada</option>
+                        </select>
+                        <ChevronDown size={14} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--color-geo-text-dim)', pointerEvents: 'none' }} />
+                    </div>
+                </div>
+
+                <div className="glass-card" style={{ flex: 1, overflow: 'auto' }}>
+                    <table className="data-table">
+                        <thead><tr><th>ID</th><th>Título</th><th>Cliente</th><th>Técnico</th><th>Estado</th><th>Prioridad</th><th>Fecha</th><th>Acciones</th></tr></thead>
+                        <tbody>
+                            {filtered.map(o => {
+                                const p = priorityColors[o.priority] || priorityColors['media'];
+                                return (
+                                    <tr key={o.id} style={{ cursor: 'pointer', background: selected?.id === o.id ? 'rgba(59,130,246,0.06)' : undefined }} onClick={() => setSelected(o)}>
+                                        <td style={{ fontWeight: 600, color: 'var(--color-geo-text)' }}>{o.id}</td>
+                                        <td style={{ fontWeight: 500, color: 'var(--color-geo-text)', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis' }}>{o.title}</td>
+                                        <td>{o.client}</td>
+                                        <td>{getTechName(o.technicianId)}</td>
+                                        <td><span className={`badge ${statusMap[o.status]?.cls || 'badge-pending'}`}>{statusMap[o.status]?.label || o.status}</span></td>
+                                        <td><span style={{ padding: '3px 10px', borderRadius: 6, fontSize: 11, fontWeight: 600, background: p.bg, color: p.color }}>{o.priority}</span></td>
+                                        <td style={{ fontSize: 12 }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><Calendar size={12} /> {o.scheduledDate}</div>
+                                        </td>
+                                        <td>
+                                            <div style={{ display: 'flex', gap: 4 }} onClick={e => e.stopPropagation()}>
+                                                <button onClick={() => { setForm(o); setModal('edit'); }} style={{ width: 28, height: 28, borderRadius: 6, border: 'none', background: 'var(--color-geo-surface-2)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-geo-text-dim)' }}><Edit size={13} /></button>
+                                                <button onClick={() => setArchiveId(o.id)} style={{ width: 28, height: 28, borderRadius: 6, border: 'none', background: 'rgba(239,68,68,0.08)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#f87171' }}><Archive size={13} /></button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                );
+                            })}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            {/* Detail panel */}
+            {selected && (
+                <div className="glass-card animate-fade-in-up" style={{ width: 340, flexShrink: 0, padding: 24, overflow: 'auto' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
+                        <div>
+                            <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-geo-primary-light)' }}>{selected.id}</span>
+                            <h3 style={{ fontSize: 16, fontWeight: 700, marginTop: 4 }}>{selected.title}</h3>
+                        </div>
+                        <span className={`badge ${statusMap[selected.status]?.cls}`}>{statusMap[selected.status]?.label}</span>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 14, fontSize: 13, color: 'var(--color-geo-text-muted)' }}>
+                        <div><span style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-geo-text-dim)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Cliente</span><div style={{ marginTop: 4 }}>{selected.client}</div><div style={{ fontSize: 12, color: 'var(--color-geo-text-dim)' }}>{selected.clientAddress}</div></div>
+                        <div><span style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-geo-text-dim)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Técnico Asignado</span><div style={{ marginTop: 4 }}>{getTechName(selected.technicianId)}</div></div>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                            <div><span style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-geo-text-dim)', textTransform: 'uppercase' }}>Fecha</span><div style={{ marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}><Calendar size={13} /> {selected.scheduledDate}</div></div>
+                            <div><span style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-geo-text-dim)', textTransform: 'uppercase' }}>Duración</span><div style={{ marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}><Clock size={13} /> {selected.estimatedDuration}</div></div>
+                        </div>
+                        {selected.description && <div><span style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-geo-text-dim)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Descripción</span><p style={{ marginTop: 4, lineHeight: 1.5 }}>{selected.description}</p></div>}
+                    </div>
+                    <div style={{ display: 'flex', gap: 8, marginTop: 20 }}>
+                        <BtnPrimary onClick={() => { setForm(selected); setModal('edit'); }} style={{ flex: 1, textAlign: 'center' }}>
+                            <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}><Edit size={14} /> Editar</span>
+                        </BtnPrimary>
+                        <BtnDanger onClick={() => setArchiveId(selected.id)} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <Archive size={14} /> Archivar
+                        </BtnDanger>
+                    </div>
+                </div>
+            )}
+
+            {/* Create/Edit Modal */}
+            <Modal open={!!modal} onClose={() => setModal(null)} title={modal === 'create' ? 'Nueva Orden de Trabajo' : 'Editar Orden'} subtitle="Datos de la OT" width={600} footer={<><BtnSecondary onClick={() => setModal(null)}>Cancelar</BtnSecondary><BtnPrimary onClick={handleSave}>Guardar</BtnPrimary></>}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 16px' }}>
+                    <FormField label="Título"><input className="geo-input" style={{ width: '100%' }} value={form.title || ''} onChange={e => set('title', e.target.value)} placeholder="Instalación eléctrica..." /></FormField>
+                    <FormField label="Cliente"><input className="geo-input" style={{ width: '100%' }} value={form.client || ''} onChange={e => set('client', e.target.value)} /></FormField>
+                    <FormField label="Dirección del Cliente"><input className="geo-input" style={{ width: '100%' }} value={form.clientAddress || ''} onChange={e => set('clientAddress', e.target.value)} /></FormField>
+                    <FormField label="Técnico Asignado">
+                        <select className="geo-input" style={{ width: '100%', appearance: 'none' }} value={form.technicianId || ''} onChange={e => set('technicianId', e.target.value)}>
+                            <option value="">Seleccionar técnico...</option>
+                            {techs.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                        </select>
+                    </FormField>
+                    <FormField label="Fecha Programada"><input className="geo-input" type="date" style={{ width: '100%' }} value={form.scheduledDate || ''} onChange={e => set('scheduledDate', e.target.value)} /></FormField>
+                    <FormField label="Duración Estimada"><input className="geo-input" style={{ width: '100%' }} value={form.estimatedDuration || ''} onChange={e => set('estimatedDuration', e.target.value)} placeholder="2h" /></FormField>
+                    <FormField label="Prioridad">
+                        <select className="geo-input" style={{ width: '100%', appearance: 'none' }} value={form.priority || 'media'} onChange={e => set('priority', e.target.value)}>
+                            <option value="baja">Baja</option><option value="media">Media</option><option value="alta">Alta</option><option value="urgente">Urgente</option>
+                        </select>
+                    </FormField>
+                    <FormField label="Estado">
+                        <select className="geo-input" style={{ width: '100%', appearance: 'none' }} value={form.status || 'pendiente'} onChange={e => set('status', e.target.value)}>
+                            <option value="pendiente">Pendiente</option><option value="en-progreso">En Progreso</option><option value="completada">Completada</option><option value="cancelada">Cancelada</option>
+                        </select>
+                    </FormField>
+                </div>
+                <FormField label="Descripción"><textarea className="geo-input" style={{ width: '100%', minHeight: 70, resize: 'vertical' }} value={form.description || ''} onChange={e => set('description', e.target.value)} /></FormField>
+            </Modal>
+
+            <ConfirmDialog open={!!archiveId} onClose={() => setArchiveId(null)} onConfirm={() => { if (archiveId) handleArchive(archiveId); setArchiveId(null); }} message="Esta orden será archivada. El historial se conservará pero no aparecerá en la vista activa." confirmText="Archivar" />
+        </div>
+    );
+}

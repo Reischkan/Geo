@@ -1,0 +1,264 @@
+@import "tailwindcss";
+
+/* ==========================================
+   GeoField Design System — Dark Mode First
+   ========================================== */
+
+@theme {
+  --color-geo-bg: #0b0f1a;
+  --color-geo-surface: #111827;
+  --color-geo-surface-2: #1a2236;
+  --color-geo-surface-3: #243049;
+  --color-geo-border: #1e293b;
+  --color-geo-border-light: #334155;
+  --color-geo-text: #f1f5f9;
+  --color-geo-text-muted: #94a3b8;
+  --color-geo-text-dim: #64748b;
+  --color-geo-primary: #3b82f6;
+  --color-geo-primary-light: #60a5fa;
+  --color-geo-primary-dark: #2563eb;
+  --color-geo-accent: #06b6d4;
+  --color-geo-accent-light: #22d3ee;
+  --color-geo-success: #10b981;
+  --color-geo-warning: #f59e0b;
+  --color-geo-danger: #ef4444;
+  --color-geo-purple: #8b5cf6;
+  --color-geo-pink: #ec4899;
+  --font-family-sans: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+/* === Base === */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  height: 100%;
+  width: 100%;
+  font-family: var(--font-family-sans);
+  background: var(--color-geo-bg);
+  color: var(--color-geo-text);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* === Scrollbar === */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-geo-border-light);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-geo-text-dim);
+}
+
+/* === Glass Card === */
+.glass-card {
+  background: linear-gradient(135deg, rgba(17, 24, 39, 0.8), rgba(26, 34, 54, 0.6));
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--color-geo-border);
+  border-radius: 16px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.glass-card:hover {
+  border-color: var(--color-geo-border-light);
+  box-shadow: 0 8px 32px rgba(59, 130, 246, 0.08);
+}
+
+/* === Sidebar === */
+.sidebar {
+  background: linear-gradient(180deg, #0f1629 0%, #0b0f1a 100%);
+  border-right: 1px solid var(--color-geo-border);
+}
+
+.sidebar-link {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  border-radius: 10px;
+  color: var(--color-geo-text-muted);
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.sidebar-link:hover {
+  background: rgba(59, 130, 246, 0.08);
+  color: var(--color-geo-text);
+}
+
+.sidebar-link.active {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.15), rgba(6, 182, 212, 0.1));
+  color: var(--color-geo-primary-light);
+  box-shadow: inset 0 0 0 1px rgba(59, 130, 246, 0.2);
+}
+
+/* === Stat Card === */
+.stat-card {
+  position: relative;
+  overflow: hidden;
+}
+
+.stat-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  border-radius: 16px 16px 0 0;
+}
+
+.stat-card.blue::before { background: linear-gradient(90deg, #3b82f6, #06b6d4); }
+.stat-card.green::before { background: linear-gradient(90deg, #10b981, #34d399); }
+.stat-card.purple::before { background: linear-gradient(90deg, #8b5cf6, #a78bfa); }
+.stat-card.amber::before { background: linear-gradient(90deg, #f59e0b, #fbbf24); }
+
+/* === Status Badges === */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  border-radius: 9999px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.025em;
+}
+
+.badge-pending { background: rgba(245, 158, 11, 0.15); color: #fbbf24; }
+.badge-progress { background: rgba(59, 130, 246, 0.15); color: #60a5fa; }
+.badge-completed { background: rgba(16, 185, 129, 0.15); color: #34d399; }
+.badge-cancelled { background: rgba(239, 68, 68, 0.15); color: #f87171; }
+
+/* === Table === */
+.data-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.data-table thead th {
+  padding: 12px 16px;
+  text-align: left;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-geo-text-dim);
+  border-bottom: 1px solid var(--color-geo-border);
+  white-space: nowrap;
+}
+
+.data-table tbody tr {
+  transition: background 0.15s ease;
+}
+
+.data-table tbody tr:hover {
+  background: rgba(59, 130, 246, 0.04);
+}
+
+.data-table tbody td {
+  padding: 14px 16px;
+  font-size: 14px;
+  color: var(--color-geo-text-muted);
+  border-bottom: 1px solid rgba(30, 41, 59, 0.5);
+  white-space: nowrap;
+}
+
+/* === Animations === */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.3); }
+  50% { box-shadow: 0 0 12px 4px rgba(59, 130, 246, 0.15); }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.animate-fade-in-up {
+  animation: fadeInUp 0.5s ease forwards;
+}
+
+.animate-delay-1 { animation-delay: 0.1s; opacity: 0; }
+.animate-delay-2 { animation-delay: 0.2s; opacity: 0; }
+.animate-delay-3 { animation-delay: 0.3s; opacity: 0; }
+.animate-delay-4 { animation-delay: 0.4s; opacity: 0; }
+
+/* === Chart Tooltip === */
+.recharts-default-tooltip {
+  background: var(--color-geo-surface-2) !important;
+  border: 1px solid var(--color-geo-border) !important;
+  border-radius: 8px !important;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.3) !important;
+}
+
+/* === Calendar Cell === */
+.calendar-cell {
+  border: 1px solid var(--color-geo-border);
+  border-radius: 8px;
+  min-height: 90px;
+  padding: 8px;
+  transition: all 0.2s ease;
+  background: var(--color-geo-surface);
+}
+
+.calendar-cell:hover {
+  border-color: var(--color-geo-border-light);
+  background: var(--color-geo-surface-2);
+}
+
+.calendar-cell.today {
+  border-color: var(--color-geo-primary);
+  box-shadow: inset 0 0 0 1px rgba(59, 130, 246, 0.2);
+}
+
+/* === Leaflet Overrides === */
+.leaflet-container {
+  background: var(--color-geo-surface) !important;
+  border-radius: 12px;
+}
+
+.leaflet-tile-pane {
+  filter: brightness(0.7) contrast(1.1) saturate(0.8);
+}
+
+/* === Input === */
+.geo-input {
+  background: var(--color-geo-surface-2);
+  border: 1px solid var(--color-geo-border);
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 14px;
+  color: var(--color-geo-text);
+  outline: none;
+  transition: all 0.2s ease;
+  font-family: var(--font-family-sans);
+}
+
+.geo-input::placeholder {
+  color: var(--color-geo-text-dim);
+}
+
+.geo-input:focus {
+  border-color: var(--color-geo-primary);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+}
