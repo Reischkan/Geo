@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 
 /**
  * Custom hook to fetch data from the GeoField backend API.
- * Falls back to provided default data if fetch fails.
+ * Sends JWT token from localStorage. Falls back to provided default data if fetch fails.
  */
 export function useApi<T>(url: string, fallback: T): { data: T; loading: boolean; error: string | null; refetch: () => void } {
     const [data, setData] = useState<T>(fallback);
@@ -13,8 +13,18 @@ export function useApi<T>(url: string, fallback: T): { data: T; loading: boolean
     useEffect(() => {
         let cancelled = false;
         setLoading(true);
-        fetch(url)
+        const token = localStorage.getItem('geofield_token');
+        const headers: Record<string, string> = {};
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+
+        fetch(url, { headers })
             .then(res => {
+                if (res.status === 401) {
+                    // Token expired — force logout
+                    localStorage.removeItem('geofield_token');
+                    window.location.href = '/login';
+                    throw new Error('Unauthorized');
+                }
                 if (!res.ok) throw new Error(`HTTP ${res.status}`);
                 return res.json();
             })

@@ -16,11 +16,11 @@ export class DashboardService {
         private readonly activityRepo: Repository<ActivityFeedItem>,
     ) { }
 
-    async getKpis() {
+    async getKpis(tenantId: string) {
         const today = new Date().toISOString().slice(0, 10);
-        const allOrders = await this.orderRepo.find();
+        const allOrders = await this.orderRepo.find({ where: { tenantId } });
         const ordersToday = allOrders.filter(o => o.scheduledDate === today).length || allOrders.length;
-        const techs = await this.techRepo.find();
+        const techs = await this.techRepo.find({ where: { tenantId } });
         const activeTechnicians = techs.filter(t => t.status !== 'desconectado').length;
         const fieldHours = +(techs.reduce((s, t) => s + t.hoursLogged, 0) / techs.length * 0.15).toFixed(1) || 26.5;
         const satisfaction = +(techs.reduce((s, t) => s + t.rating, 0) / techs.length).toFixed(1);
@@ -37,8 +37,8 @@ export class DashboardService {
         };
     }
 
-    async getActivity() {
-        return this.activityRepo.find({ order: { id: 'ASC' } });
+    async getActivity(tenantId: string) {
+        return this.activityRepo.find({ where: { tenantId }, order: { id: 'ASC' } });
     }
 
     async getRevenueChart() {
@@ -52,8 +52,8 @@ export class DashboardService {
         ];
     }
 
-    async getStatusBreakdown() {
-        const orders = await this.orderRepo.find();
+    async getStatusBreakdown(tenantId: string) {
+        const orders = await this.orderRepo.find({ where: { tenantId } });
         const counts: Record<string, number> = { completada: 0, 'en-progreso': 0, pendiente: 0, cancelada: 0 };
         orders.forEach(o => { counts[o.status] = (counts[o.status] || 0) + 1; });
         return [
@@ -64,14 +64,14 @@ export class DashboardService {
         ];
     }
 
-    async getAlerts() {
-        const techs = await this.techRepo.find();
+    async getAlerts(tenantId: string) {
+        const techs = await this.techRepo.find({ where: { tenantId } });
         const disconnected = techs.filter(t => t.status === 'desconectado');
         const alerts: { type: string; severity: string; message: string }[] = [];
         disconnected.forEach(t => {
             alerts.push({ type: 'check-in', severity: 'warning', message: `${t.name} no ha hecho check-in hoy` });
         });
-        const orders = await this.orderRepo.find();
+        const orders = await this.orderRepo.find({ where: { tenantId } });
         const overdue = orders.filter(o => o.status === 'pendiente' && o.scheduledDate < new Date().toISOString().slice(0, 10));
         overdue.forEach(o => {
             alerts.push({ type: 'delay', severity: 'error', message: `OT ${o.id} "${o.title}" está retrasada` });

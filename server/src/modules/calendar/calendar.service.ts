@@ -10,8 +10,8 @@ export class CalendarService {
         private readonly repo: Repository<CalendarEvent>,
     ) { }
 
-    async getEvents(month: number, year: number) {
-        const events = await this.repo.findBy({ month, year });
+    async getEvents(month: number, year: number, tenantId: string) {
+        const events = await this.repo.findBy({ month, year, tenantId });
 
         // Group by day → Record<number, {title, tech, color}[]>
         const grouped: Record<number, { title: string; tech: string; color: string }[]> = {};

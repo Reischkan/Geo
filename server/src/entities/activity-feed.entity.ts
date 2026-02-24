@@ -16,4 +16,7 @@ export class ActivityFeedItem {
 
     @Column()
     icon: string;
+
+    @Column({ default: 'tenant-mx' })
+    tenantId: string;
 }

@@ -31,4 +31,7 @@ export class Client {
 
     @Column({ default: true })
     active: boolean;
+
+    @Column({ default: 'tenant-mx' })
+    tenantId: string;
 }

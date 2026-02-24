@@ -22,4 +22,7 @@ export class CalendarEvent {
 
     @Column()
     color: string;
+
+    @Column({ default: 'tenant-mx' })
+    tenantId: string;
 }

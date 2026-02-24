@@ -34,4 +34,7 @@ export class WorkOrder {
 
     @Column({ default: '' })
     description: string;
+
+    @Column({ default: 'tenant-mx' })
+    tenantId: string;
 }

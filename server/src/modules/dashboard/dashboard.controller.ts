@@ -1,4 +1,4 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, Request } from '@nestjs/common';
 import { DashboardService } from './dashboard.service';
 
 @Controller('api/dashboard')
@@ -6,17 +6,17 @@ export class DashboardController {
     constructor(private readonly svc: DashboardService) { }
 
     @Get('kpis')
-    getKpis() { return this.svc.getKpis(); }
+    getKpis(@Request() req: any) { return this.svc.getKpis(req.user.tenantId); }
 
     @Get('activity')
-    getActivity() { return this.svc.getActivity(); }
+    getActivity(@Request() req: any) { return this.svc.getActivity(req.user.tenantId); }
 
     @Get('revenue-chart')
     getRevenueChart() { return this.svc.getRevenueChart(); }
 
     @Get('status-breakdown')
-    getStatusBreakdown() { return this.svc.getStatusBreakdown(); }
+    getStatusBreakdown(@Request() req: any) { return this.svc.getStatusBreakdown(req.user.tenantId); }
 
     @Get('alerts')
-    getAlerts() { return this.svc.getAlerts(); }
+    getAlerts(@Request() req: any) { return this.svc.getAlerts(req.user.tenantId); }
 }

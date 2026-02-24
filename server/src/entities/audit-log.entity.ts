@@ -19,4 +19,7 @@ export class AuditLog {
 
     @Column({ default: '' })
     details: string;
+
+    @Column({ default: 'tenant-mx' })
+    tenantId: string;
 }

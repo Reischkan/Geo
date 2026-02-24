@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Search, Filter, ChevronDown, Plus, Edit, Archive, Eye, Calendar, Clock } from 'lucide-react';
 import { useApi } from '../hooks/useApi';
+import { authFetch } from '../hooks/authFetch';
 import { useToast } from '../components/Toast';
 import Modal, { FormField, BtnPrimary, BtnSecondary, BtnDanger } from '../components/Modal';
 import ConfirmDialog from '../components/ConfirmDialog';
@@ -56,7 +57,7 @@ export default function OrdersPage() {
         const isNew = modal === 'create';
         const id = isNew ? `OT-${String(Date.now()).slice(-4)}` : form.id;
         const body = { ...form, id };
-        const res = await fetch(isNew ? '/api/work-orders' : `/api/work-orders/${id}`, {
+        const res = await authFetch(isNew ? '/api/work-orders' : `/api/work-orders/${id}`, {
             method: isNew ? 'POST' : 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(body),
@@ -68,7 +69,7 @@ export default function OrdersPage() {
     };
 
     const handleArchive = async (id: string) => {
-        const res = await fetch(`/api/work-orders/${id}`, { method: 'DELETE' });
+        const res = await authFetch(`/api/work-orders/${id}`, { method: 'DELETE' });
         if (res.ok) { toast('success', 'Orden archivada'); refetch(); }
         else toast('error', 'Error al archivar');
     };

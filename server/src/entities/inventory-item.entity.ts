@@ -31,4 +31,7 @@ export class InventoryItem {
 
     @Column('float', { default: 0 })
     unitCost: number;
+
+    @Column({ default: 'tenant-mx' })
+    tenantId: string;
 }

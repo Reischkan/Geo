@@ -3,6 +3,7 @@ import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
 import { Navigation, Phone, MapPin, Zap, ChevronDown } from 'lucide-react';
 import { useApi } from '../hooks/useApi';
+import { authFetch } from '../hooks/authFetch';
 import { useToast } from '../components/Toast';
 
 interface Tech {
@@ -32,7 +33,7 @@ export default function LiveMapPage() {
     const activeTechs = techs.filter(t => t.status !== 'desconectado');
 
     const handleStatusChange = async (techId: string, newStatus: string) => {
-        const res = await fetch(`/api/technicians/${techId}`, {
+        const res = await authFetch(`/api/technicians/${techId}`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ status: newStatus }),

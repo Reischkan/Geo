@@ -10,26 +10,26 @@ export class ProjectsService {
         private readonly repo: Repository<Project>,
     ) { }
 
-    findAll() { return this.repo.find(); }
+    findAll(tenantId: string) { return this.repo.find({ where: { tenantId } }); }
 
-    async findOne(id: string) {
-        const project = await this.repo.findOneBy({ id });
+    async findOne(id: string, tenantId: string) {
+        const project = await this.repo.findOneBy({ id, tenantId });
         if (!project) throw new NotFoundException(`Project ${id} not found`);
         return project;
     }
 
-    create(data: Partial<Project>) {
-        const project = this.repo.create(data);
+    create(data: Partial<Project>, tenantId: string) {
+        const project = this.repo.create({ ...data, tenantId });
         return this.repo.save(project);
     }
 
-    async update(id: string, data: Partial<Project>) {
-        await this.repo.update(id, data);
-        return this.findOne(id);
+    async update(id: string, data: Partial<Project>, tenantId: string) {
+        await this.repo.update({ id, tenantId }, data);
+        return this.findOne(id, tenantId);
     }
 
-    async archive(id: string) {
-        await this.repo.update(id, { status: 'archivado' });
+    async archive(id: string, tenantId: string) {
+        await this.repo.update({ id, tenantId }, { status: 'archivado' });
         return { message: `Project ${id} archived` };
     }
 }

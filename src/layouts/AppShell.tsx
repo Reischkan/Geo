@@ -1,4 +1,5 @@
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 import {
     LayoutDashboard,
     ClipboardList,
@@ -12,6 +13,7 @@ import {
     Bell,
     Search,
     ChevronRight,
+    LogOut,
     Radio,
 } from 'lucide-react';
 import { useState } from 'react';
@@ -46,6 +48,7 @@ const breadcrumbMap: Record<string, string> = {
 export default function AppShell() {
     const location = useLocation();
     const [searchOpen, setSearchOpen] = useState(false);
+    const { user, tenant, logout } = useAuth();
 
     return (
         <div style={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
@@ -63,7 +66,7 @@ export default function AppShell() {
                     </div>
                     <div>
                         <div style={{ fontWeight: 700, fontSize: 18, letterSpacing: '-0.02em', color: 'var(--color-geo-text)' }}>GeoField</div>
-                        <div style={{ fontSize: 11, color: 'var(--color-geo-text-dim)', fontWeight: 500 }}>Centro de Mando</div>
+                        <div style={{ fontSize: 11, color: 'var(--color-geo-text-dim)', fontWeight: 500 }}>{tenant?.name || 'Centro de Mando'}</div>
                     </div>
                 </div>
 
@@ -109,12 +112,22 @@ export default function AppShell() {
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                         fontSize: 13, fontWeight: 700, color: '#fff',
                     }}>
-                        AD
+                        {user?.name?.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase() || 'AD'}
                     </div>
-                    <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-geo-text)' }}>Admin Principal</div>
-                        <div style={{ fontSize: 11, color: 'var(--color-geo-text-dim)' }}>admin@geofield.mx</div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-geo-text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{user?.name || 'Admin'}</div>
+                        <div style={{ fontSize: 11, color: 'var(--color-geo-text-dim)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{user?.email || ''}</div>
                     </div>
+                    <button onClick={logout} title="Cerrar sesión" style={{
+                        background: 'none', border: 'none', cursor: 'pointer',
+                        color: 'var(--color-geo-text-dim)', padding: 6, borderRadius: 8,
+                        transition: 'all 0.15s',
+                    }}
+                        onMouseEnter={e => { e.currentTarget.style.color = '#f87171'; e.currentTarget.style.background = 'rgba(239,68,68,0.1)'; }}
+                        onMouseLeave={e => { e.currentTarget.style.color = 'var(--color-geo-text-dim)'; e.currentTarget.style.background = 'none'; }}
+                    >
+                        <LogOut size={16} />
+                    </button>
                 </div>
             </aside>
 

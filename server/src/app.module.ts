@@ -8,6 +8,8 @@ import { CalendarEvent } from './entities/calendar-event.entity';
 import { ActivityFeedItem } from './entities/activity-feed.entity';
 import { Client } from './entities/client.entity';
 import { AuditLog } from './entities/audit-log.entity';
+import { Tenant } from './entities/tenant.entity';
+import { User } from './entities/user.entity';
 import { TechniciansModule } from './modules/technicians/technicians.module';
 import { WorkOrdersModule } from './modules/work-orders/work-orders.module';
 import { ProjectsModule } from './modules/projects/projects.module';
@@ -16,6 +18,7 @@ import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { CalendarModule } from './modules/calendar/calendar.module';
 import { ClientsModule } from './modules/clients/clients.module';
 import { AuditModule } from './modules/audit/audit.module';
+import { AuthModule } from './modules/auth/auth.module';
 import { SeedService } from './seed.service';
 
 @Module({
@@ -23,10 +26,10 @@ import { SeedService } from './seed.service';
         TypeOrmModule.forRoot({
             type: 'better-sqlite3',
             database: 'geofield.db',
-            entities: [Technician, WorkOrder, Project, InventoryItem, CalendarEvent, ActivityFeedItem, Client, AuditLog],
+            entities: [Technician, WorkOrder, Project, InventoryItem, CalendarEvent, ActivityFeedItem, Client, AuditLog, Tenant, User],
             synchronize: true,
         }),
-        TypeOrmModule.forFeature([Technician, WorkOrder, Project, InventoryItem, CalendarEvent, ActivityFeedItem, Client, AuditLog]),
+        TypeOrmModule.forFeature([Technician, WorkOrder, Project, InventoryItem, CalendarEvent, ActivityFeedItem, Client, AuditLog, Tenant, User]),
         TechniciansModule,
         WorkOrdersModule,
         ProjectsModule,
@@ -35,6 +38,7 @@ import { SeedService } from './seed.service';
         CalendarModule,
         ClientsModule,
         AuditModule,
+        AuthModule,
     ],
     providers: [SeedService],
 })

@@ -10,22 +10,22 @@ export class InventoryService {
         private readonly repo: Repository<InventoryItem>,
     ) { }
 
-    findAll() { return this.repo.find(); }
+    findAll(tenantId: string) { return this.repo.find({ where: { tenantId } }); }
 
-    create(data: Partial<InventoryItem>) {
-        const item = this.repo.create(data);
+    create(data: Partial<InventoryItem>, tenantId: string) {
+        const item = this.repo.create({ ...data, tenantId });
         return this.repo.save(item);
     }
 
-    async update(id: string, data: Partial<InventoryItem>) {
-        const item = await this.repo.findOneBy({ id });
+    async update(id: string, data: Partial<InventoryItem>, tenantId: string) {
+        const item = await this.repo.findOneBy({ id, tenantId });
         if (!item) throw new NotFoundException(`Item ${id} not found`);
-        await this.repo.update(id, data);
+        await this.repo.update({ id, tenantId }, data);
         return this.repo.findOneBy({ id });
     }
 
-    async remove(id: string) {
-        const item = await this.repo.findOneBy({ id });
+    async remove(id: string, tenantId: string) {
+        const item = await this.repo.findOneBy({ id, tenantId });
         if (!item) throw new NotFoundException(`Item ${id} not found`);
         await this.repo.delete(id);
         return { message: `Item ${id} deleted` };

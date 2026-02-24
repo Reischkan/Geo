@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Search, AlertTriangle, Package, Truck, Plus, Edit, Trash2, Warehouse } from 'lucide-react';
 import { useApi } from '../hooks/useApi';
+import { authFetch } from '../hooks/authFetch';
 import { useToast } from '../components/Toast';
 import Modal, { FormField, BtnPrimary, BtnSecondary } from '../components/Modal';
 import ConfirmDialog from '../components/ConfirmDialog';
@@ -41,7 +42,7 @@ export default function InventoryPage() {
         const isNew = modal === 'create';
         const id = isNew ? `INV-${String(Date.now()).slice(-4)}` : form.id;
         const body = { ...form, id };
-        const res = await fetch(isNew ? '/api/inventory' : `/api/inventory/${id}`, {
+        const res = await authFetch(isNew ? '/api/inventory' : `/api/inventory/${id}`, {
             method: isNew ? 'POST' : 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(body),
@@ -51,7 +52,7 @@ export default function InventoryPage() {
     };
 
     const handleDelete = async (id: string) => {
-        const res = await fetch(`/api/inventory/${id}`, { method: 'DELETE' });
+        const res = await authFetch(`/api/inventory/${id}`, { method: 'DELETE' });
         if (res.ok) { toast('success', 'Producto eliminado'); refetch(); }
         else toast('error', 'Error al eliminar');
     };

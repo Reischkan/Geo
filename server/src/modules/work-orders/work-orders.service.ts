@@ -10,29 +10,30 @@ export class WorkOrdersService {
         private readonly repo: Repository<WorkOrder>,
     ) { }
 
-    findAll(status?: string) {
-        if (status && status !== 'all') return this.repo.findBy({ status });
-        return this.repo.find();
+    findAll(tenantId: string, status?: string) {
+        const where: any = { tenantId };
+        if (status && status !== 'all') where.status = status;
+        return this.repo.find({ where });
     }
 
-    async findOne(id: string) {
-        const order = await this.repo.findOneBy({ id });
+    async findOne(id: string, tenantId: string) {
+        const order = await this.repo.findOneBy({ id, tenantId });
         if (!order) throw new NotFoundException(`WorkOrder ${id} not found`);
         return order;
     }
 
-    create(data: Partial<WorkOrder>) {
-        const order = this.repo.create(data);
+    create(data: Partial<WorkOrder>, tenantId: string) {
+        const order = this.repo.create({ ...data, tenantId });
         return this.repo.save(order);
     }
 
-    async update(id: string, data: Partial<WorkOrder>) {
-        await this.repo.update(id, data);
-        return this.findOne(id);
+    async update(id: string, data: Partial<WorkOrder>, tenantId: string) {
+        await this.repo.update({ id, tenantId }, data);
+        return this.findOne(id, tenantId);
     }
 
-    async archive(id: string) {
-        await this.repo.update(id, { status: 'archivada' });
+    async archive(id: string, tenantId: string) {
+        await this.repo.update({ id, tenantId }, { status: 'archivada' });
         return { message: `WorkOrder ${id} archived` };
     }
 }

@@ -34,4 +34,7 @@ export class Project {
 
     @Column('simple-json', { default: '[]' })
     technicianIds: string[];
+
+    @Column({ default: 'tenant-mx' })
+    tenantId: string;
 }

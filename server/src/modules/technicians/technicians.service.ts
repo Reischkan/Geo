@@ -10,26 +10,26 @@ export class TechniciansService {
         private readonly repo: Repository<Technician>,
     ) { }
 
-    findAll() { return this.repo.find(); }
+    findAll(tenantId: string) { return this.repo.find({ where: { tenantId } }); }
 
-    async findOne(id: string) {
-        const tech = await this.repo.findOneBy({ id });
+    async findOne(id: string, tenantId: string) {
+        const tech = await this.repo.findOneBy({ id, tenantId });
         if (!tech) throw new NotFoundException(`Technician ${id} not found`);
         return tech;
     }
 
-    create(data: Partial<Technician>) {
-        const tech = this.repo.create(data);
+    create(data: Partial<Technician>, tenantId: string) {
+        const tech = this.repo.create({ ...data, tenantId });
         return this.repo.save(tech);
     }
 
-    async update(id: string, data: Partial<Technician>) {
-        await this.repo.update(id, data);
-        return this.findOne(id);
+    async update(id: string, data: Partial<Technician>, tenantId: string) {
+        await this.repo.update({ id, tenantId }, data);
+        return this.findOne(id, tenantId);
     }
 
-    async deactivate(id: string) {
-        await this.repo.update(id, { status: 'desconectado' });
+    async deactivate(id: string, tenantId: string) {
+        await this.repo.update({ id, tenantId }, { status: 'desconectado' });
         return { message: `Technician ${id} deactivated` };
     }
 }

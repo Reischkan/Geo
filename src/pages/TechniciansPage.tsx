@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Star, Phone, MapPin, Clock, CheckCircle, TrendingUp, Plus, Edit, UserX, Search } from 'lucide-react';
 import { useApi } from '../hooks/useApi';
+import { authFetch } from '../hooks/authFetch';
 import { useToast } from '../components/Toast';
 import Modal, { FormField, BtnPrimary, BtnSecondary } from '../components/Modal';
 import ConfirmDialog from '../components/ConfirmDialog';
@@ -35,7 +36,7 @@ export default function TechniciansPage() {
         const id = isNew ? `T${String(Date.now()).slice(-3)}` : form.id;
         const avatar = form.name ? form.name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase() : 'XX';
         const body = { ...form, id, avatar };
-        const res = await fetch(isNew ? '/api/technicians' : `/api/technicians/${id}`, {
+        const res = await authFetch(isNew ? '/api/technicians' : `/api/technicians/${id}`, {
             method: isNew ? 'POST' : 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(body),
@@ -45,7 +46,7 @@ export default function TechniciansPage() {
     };
 
     const handleDeactivate = async (id: string) => {
-        const res = await fetch(`/api/technicians/${id}`, { method: 'DELETE' });
+        const res = await authFetch(`/api/technicians/${id}`, { method: 'DELETE' });
         if (res.ok) { toast('success', 'Técnico desactivado'); refetch(); }
         else toast('error', 'Error al desactivar');
     };

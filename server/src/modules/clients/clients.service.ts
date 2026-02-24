@@ -10,26 +10,26 @@ export class ClientsService {
         private readonly repo: Repository<Client>,
     ) { }
 
-    findAll() { return this.repo.find(); }
+    findAll(tenantId: string) { return this.repo.find({ where: { tenantId } }); }
 
-    async findOne(id: string) {
-        const client = await this.repo.findOneBy({ id });
+    async findOne(id: string, tenantId: string) {
+        const client = await this.repo.findOneBy({ id, tenantId });
         if (!client) throw new NotFoundException(`Client ${id} not found`);
         return client;
     }
 
-    create(data: Partial<Client>) {
-        const client = this.repo.create(data);
+    create(data: Partial<Client>, tenantId: string) {
+        const client = this.repo.create({ ...data, tenantId });
         return this.repo.save(client);
     }
 
-    async update(id: string, data: Partial<Client>) {
-        await this.repo.update(id, data);
-        return this.findOne(id);
+    async update(id: string, data: Partial<Client>, tenantId: string) {
+        await this.repo.update({ id, tenantId }, data);
+        return this.findOne(id, tenantId);
     }
 
-    async deactivate(id: string) {
-        await this.repo.update(id, { active: false });
+    async deactivate(id: string, tenantId: string) {
+        await this.repo.update({ id, tenantId }, { active: false });
         return { message: `Client ${id} deactivated` };
     }
 }

@@ -10,12 +10,12 @@ export class AuditService {
         private readonly repo: Repository<AuditLog>,
     ) { }
 
-    findAll(limit = 100) {
-        return this.repo.find({ order: { id: 'DESC' }, take: limit });
+    findAll(tenantId: string, limit = 100) {
+        return this.repo.find({ where: { tenantId }, order: { id: 'DESC' }, take: limit });
     }
 
-    log(action: string, resource: string, details: string, user = 'Admin') {
-        const entry = this.repo.create({ action, resource, details, user });
+    log(action: string, resource: string, details: string, user = 'Admin', tenantId = 'tenant-mx') {
+        const entry = this.repo.create({ action, resource, details, user, tenantId });
         return this.repo.save(entry);
     }
 }

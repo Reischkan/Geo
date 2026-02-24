@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { ChevronLeft, ChevronRight, Plus } from 'lucide-react';
 import { useApi } from '../hooks/useApi';
+import { authFetch } from '../hooks/authFetch';
 import { useToast } from '../components/Toast';
 import Modal, { FormField, BtnPrimary, BtnSecondary } from '../components/Modal';
 import { calendarEvents as fallbackEvents, technicians as fallbackTechs } from '../data/mock';
@@ -39,7 +40,7 @@ export default function CalendarPage() {
         if (!form.title || !tech) { toast('error', 'Complete todos los campos'); return; }
         // Create as a work order with the scheduled date
         const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(showCreate).padStart(2, '0')}`;
-        const res = await fetch('/api/work-orders', {
+        const res = await authFetch('/api/work-orders', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({

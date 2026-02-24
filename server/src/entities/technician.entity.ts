@@ -34,4 +34,7 @@ export class Technician {
 
     @Column({ default: 0 })
     hoursLogged: number;
+
+    @Column({ default: 'tenant-mx' })
+    tenantId: string;
 }
