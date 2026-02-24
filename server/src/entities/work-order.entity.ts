@@ -26,6 +26,9 @@ export class WorkOrder {
     @Column()
     scheduledDate: string;
 
+    @Column({ nullable: true, default: '' })
+    endDate: string;
+
     @Column()
     estimatedDuration: string;
 
@@ -34,6 +37,12 @@ export class WorkOrder {
 
     @Column({ default: '' })
     description: string;
+
+    @Column('float', { default: 19.43 })
+    lat: number;
+
+    @Column('float', { default: -99.13 })
+    lng: number;
 
     @Column({ default: 'tenant-mx' })
     tenantId: string;

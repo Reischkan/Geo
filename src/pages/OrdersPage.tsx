@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Search, Filter, ChevronDown, Plus, Edit, Archive, Eye, Calendar, Clock } from 'lucide-react';
+import { Search, Filter, ChevronDown, Plus, Edit, Archive, Calendar, Clock, MapPin } from 'lucide-react';
 import { useApi } from '../hooks/useApi';
 import { authFetch } from '../hooks/authFetch';
 import { useToast } from '../components/Toast';
@@ -10,7 +10,8 @@ import { workOrders as fallbackOrders, technicians as fallbackTechs } from '../d
 interface WorkOrder {
     id: string; title: string; client: string; clientAddress: string;
     technicianId: string; status: string; priority: string;
-    scheduledDate: string; estimatedDuration: string; projectId?: string; description: string;
+    scheduledDate: string; endDate: string; estimatedDuration: string; projectId?: string; description: string;
+    lat: number; lng: number;
 }
 interface Tech { id: string; name: string; avatar: string; }
 
@@ -29,7 +30,8 @@ const priorityColors: Record<string, { bg: string; color: string }> = {
 
 const emptyOrder: Partial<WorkOrder> = {
     title: '', client: '', clientAddress: '', technicianId: '', status: 'pendiente',
-    priority: 'media', scheduledDate: '', estimatedDuration: '2h', description: '',
+    priority: 'media', scheduledDate: '', endDate: '', estimatedDuration: '2h', description: '',
+    lat: 19.4326, lng: -99.1332,
 };
 
 export default function OrdersPage() {
@@ -52,6 +54,7 @@ export default function OrdersPage() {
 
     const getTechName = (id: string) => techs.find(t => t.id === id)?.name || id;
     const set = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }));
+    const setNum = (k: string, v: string) => setForm(f => ({ ...f, [k]: v === '' ? 0 : parseFloat(v) }));
 
     const handleSave = async () => {
         const isNew = modal === 'create';
@@ -154,6 +157,7 @@ export default function OrdersPage() {
                             <div><span style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-geo-text-dim)', textTransform: 'uppercase' }}>Fecha</span><div style={{ marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}><Calendar size={13} /> {selected.scheduledDate}</div></div>
                             <div><span style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-geo-text-dim)', textTransform: 'uppercase' }}>Duración</span><div style={{ marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}><Clock size={13} /> {selected.estimatedDuration}</div></div>
                         </div>
+                        <div><span style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-geo-text-dim)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Ubicación de Servicio</span><div style={{ marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}><MapPin size={13} /> {selected.lat?.toFixed(4)}, {selected.lng?.toFixed(4)}</div></div>
                         {selected.description && <div><span style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-geo-text-dim)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Descripción</span><p style={{ marginTop: 4, lineHeight: 1.5 }}>{selected.description}</p></div>}
                     </div>
                     <div style={{ display: 'flex', gap: 8, marginTop: 20 }}>
@@ -179,7 +183,8 @@ export default function OrdersPage() {
                             {techs.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                         </select>
                     </FormField>
-                    <FormField label="Fecha Programada"><input className="geo-input" type="date" style={{ width: '100%' }} value={form.scheduledDate || ''} onChange={e => set('scheduledDate', e.target.value)} /></FormField>
+                    <FormField label="Fecha Inicio"><input className="geo-input" type="date" style={{ width: '100%' }} value={form.scheduledDate || ''} onChange={e => set('scheduledDate', e.target.value)} /></FormField>
+                    <FormField label="Fecha Fin" hint="Dejar vacío para 1 día"><input className="geo-input" type="date" style={{ width: '100%' }} value={form.endDate || ''} onChange={e => set('endDate', e.target.value)} /></FormField>
                     <FormField label="Duración Estimada"><input className="geo-input" style={{ width: '100%' }} value={form.estimatedDuration || ''} onChange={e => set('estimatedDuration', e.target.value)} placeholder="2h" /></FormField>
                     <FormField label="Prioridad">
                         <select className="geo-input" style={{ width: '100%', appearance: 'none' }} value={form.priority || 'media'} onChange={e => set('priority', e.target.value)}>
@@ -190,6 +195,20 @@ export default function OrdersPage() {
                         <select className="geo-input" style={{ width: '100%', appearance: 'none' }} value={form.status || 'pendiente'} onChange={e => set('status', e.target.value)}>
                             <option value="pendiente">Pendiente</option><option value="en-progreso">En Progreso</option><option value="completada">Completada</option><option value="cancelada">Cancelada</option>
                         </select>
+                    </FormField>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 16px' }}>
+                    <FormField label="Latitud">
+                        <div style={{ position: 'relative' }}>
+                            <MapPin size={14} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--color-geo-text-dim)' }} />
+                            <input className="geo-input" type="number" step="0.0001" style={{ width: '100%', paddingLeft: 34 }} value={form.lat ?? 19.4326} onChange={e => setNum('lat', e.target.value)} placeholder="19.4326" />
+                        </div>
+                    </FormField>
+                    <FormField label="Longitud">
+                        <div style={{ position: 'relative' }}>
+                            <MapPin size={14} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--color-geo-text-dim)' }} />
+                            <input className="geo-input" type="number" step="0.0001" style={{ width: '100%', paddingLeft: 34 }} value={form.lng ?? -99.1332} onChange={e => setNum('lng', e.target.value)} placeholder="-99.1332" />
+                        </div>
                     </FormField>
                 </div>
                 <FormField label="Descripción"><textarea className="geo-input" style={{ width: '100%', minHeight: 70, resize: 'vertical' }} value={form.description || ''} onChange={e => set('description', e.target.value)} /></FormField>
