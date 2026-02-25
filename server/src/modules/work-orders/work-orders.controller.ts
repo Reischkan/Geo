@@ -6,7 +6,9 @@ export class WorkOrdersController {
     constructor(private readonly svc: WorkOrdersService) { }
 
     @Get()
-    findAll(@Request() req: any, @Query('status') status?: string) { return this.svc.findAll(req.user.tenantId, status); }
+    findAll(@Request() req: any, @Query('status') status?: string, @Query('archived') archived?: string) {
+        return this.svc.findAll(req.user.tenantId, status, archived === 'true' ? true : archived === 'false' ? false : undefined);
+    }
 
     @Get('material-logs')
     getMaterialLogs(@Request() req: any) { return this.svc.getMaterialLogs(req.user.tenantId); }
@@ -27,6 +29,9 @@ export class WorkOrdersController {
 
     @Delete(':id')
     archive(@Param('id') id: string, @Request() req: any) { return this.svc.archive(id, req.user.tenantId); }
+
+    @Patch(':id/unarchive')
+    unarchive(@Param('id') id: string, @Request() req: any) { return this.svc.unarchive(id, req.user.tenantId); }
 
     // ── Self-assign ──
     @Patch(':id/assign')

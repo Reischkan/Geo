@@ -47,6 +47,9 @@ export class WorkOrder {
     @Column('float', { default: -99.13 })
     lng: number;
 
+    @Column({ default: false })
+    archived: boolean;
+
     @Column({ default: 'tenant-mx' })
     tenantId: string;
 }

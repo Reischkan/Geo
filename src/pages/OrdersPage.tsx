@@ -1,11 +1,32 @@
 import { useState, useEffect } from 'react';
 import { Search, Filter, ChevronDown, Plus, Edit, Archive, Calendar, Clock, MapPin, MessageSquare, Send } from 'lucide-react';
+import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from 'react-leaflet';
+import L from 'leaflet';
 import { useApi } from '../hooks/useApi';
 import { authFetch } from '../hooks/authFetch';
 import { useToast } from '../components/Toast';
 import Modal, { FormField, BtnPrimary, BtnSecondary, BtnDanger } from '../components/Modal';
 import ConfirmDialog from '../components/ConfirmDialog';
 import { workOrders as fallbackOrders, technicians as fallbackTechs } from '../data/mock';
+
+/* ── Map picker helpers ──────────────────── */
+const pinIcon = L.divIcon({
+    className: '',
+    html: `<div style="width:32px;height:32px;border-radius:50% 50% 50% 4px;background:#3b82f6;transform:rotate(-45deg);display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,0.4)"><div style="width:12px;height:12px;background:#fff;border-radius:50%;transform:rotate(45deg)"></div></div>`,
+    iconSize: [32, 32],
+    iconAnchor: [16, 32],
+});
+
+function MapClickHandler({ onMove }: { onMove: (lat: number, lng: number) => void }) {
+    useMapEvents({ click(e) { onMove(e.latlng.lat, e.latlng.lng); } });
+    return null;
+}
+
+function RecenterMap({ lat, lng }: { lat: number; lng: number }) {
+    const map = useMap();
+    useEffect(() => { map.setView([lat, lng], map.getZoom()); }, [lat, lng]);
+    return null;
+}
 
 interface WorkOrder {
     id: string; title: string; client: string; clientAddress: string;
@@ -48,6 +69,20 @@ export default function OrdersPage() {
     const [archiveId, setArchiveId] = useState<string | null>(null);
     const [comments, setComments] = useState<OrderComment[]>([]);
     const [newComment, setNewComment] = useState('');
+    const [showArchived, setShowArchived] = useState(false);
+    const [archivedOrders, setArchivedOrders] = useState<WorkOrder[]>([]);
+    const [dateFrom, setDateFrom] = useState('');
+    const [dateTo, setDateTo] = useState('');
+
+    // Load archived orders when viewing archive
+    useEffect(() => {
+        if (showArchived) {
+            authFetch('/api/work-orders?archived=true')
+                .then(r => r.json())
+                .then(setArchivedOrders)
+                .catch(() => setArchivedOrders([]));
+        }
+    }, [showArchived, orders]);
 
     // Load comments when an order is selected
     useEffect(() => {
@@ -75,7 +110,9 @@ export default function OrdersPage() {
     const filtered = orders.filter(o => {
         const matchSearch = search === '' || o.title.toLowerCase().includes(search.toLowerCase()) || o.client.toLowerCase().includes(search.toLowerCase()) || o.id.toLowerCase().includes(search.toLowerCase());
         const matchStatus = statusFilter === 'all' || o.status === statusFilter;
-        return matchSearch && matchStatus;
+        const matchDateFrom = !dateFrom || o.scheduledDate >= dateFrom;
+        const matchDateTo = !dateTo || o.scheduledDate <= dateTo;
+        return matchSearch && matchStatus && matchDateFrom && matchDateTo;
     });
 
     const getTechName = (id: string) => techs.find(t => t.id === id)?.name || id;
@@ -99,8 +136,17 @@ export default function OrdersPage() {
 
     const handleArchive = async (id: string) => {
         const res = await authFetch(`/api/work-orders/${id}`, { method: 'DELETE' });
-        if (res.ok) { toast('success', 'Orden archivada'); refetch(); }
+        if (res.ok) { toast('success', 'Orden archivada'); setSelected(null); refetch(); }
         else toast('error', 'Error al archivar');
+    };
+
+    const handleUnarchive = async (id: string) => {
+        const res = await authFetch(`/api/work-orders/${id}/unarchive`, { method: 'PATCH' });
+        if (res.ok) {
+            toast('success', 'Orden restaurada');
+            setArchivedOrders(prev => prev.filter(o => o.id !== id));
+            refetch();
+        } else toast('error', 'Error al restaurar');
     };
 
     return (
@@ -109,65 +155,118 @@ export default function OrdersPage() {
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
                     <div>
-                        <h1 style={{ fontSize: 24, fontWeight: 700, letterSpacing: '-0.02em' }}>Órdenes de Trabajo</h1>
-                        <p style={{ fontSize: 14, color: 'var(--color-geo-text-muted)', marginTop: 4 }}>{filtered.length} órdenes</p>
+                        <h1 style={{ fontSize: 24, fontWeight: 700, letterSpacing: '-0.02em' }}>{showArchived ? 'Órdenes Archivadas' : 'Órdenes de Trabajo'}</h1>
+                        <p style={{ fontSize: 14, color: 'var(--color-geo-text-muted)', marginTop: 4 }}>{showArchived ? `${archivedOrders.length} archivadas` : `${filtered.length} órdenes`}</p>
                     </div>
-                    <button onClick={() => { setForm(emptyOrder); setModal('create'); }} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 20px', borderRadius: 10, border: 'none', fontSize: 13, fontWeight: 600, background: 'var(--color-geo-primary)', color: '#fff', cursor: 'pointer' }}>
-                        <Plus size={16} /> Nueva OT
-                    </button>
-                </div>
-
-                <div style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
-                    <div style={{ flex: 1, position: 'relative' }}>
-                        <Search size={16} style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: 'var(--color-geo-text-dim)' }} />
-                        <input className="geo-input" placeholder="Buscar OT..." value={search} onChange={e => setSearch(e.target.value)} style={{ width: '100%', paddingLeft: 40 }} />
-                    </div>
-                    <div style={{ position: 'relative' }}>
-                        <Filter size={16} style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: 'var(--color-geo-text-dim)', pointerEvents: 'none' }} />
-                        <select className="geo-input" value={statusFilter} onChange={e => setStatusFilter(e.target.value)} style={{ paddingLeft: 40, paddingRight: 30, appearance: 'none', cursor: 'pointer', minWidth: 150 }}>
-                            <option value="all">Todos</option>
-                            <option value="pendiente">Pendiente</option>
-                            <option value="en-progreso">En Progreso</option>
-                            <option value="completada">Completada</option>
-                            <option value="cancelada">Cancelada</option>
-                        </select>
-                        <ChevronDown size={14} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--color-geo-text-dim)', pointerEvents: 'none' }} />
+                    <div style={{ display: 'flex', gap: 8 }}>
+                        <button onClick={() => setShowArchived(!showArchived)} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 20px', borderRadius: 10, border: '1px solid var(--color-geo-border)', fontSize: 13, fontWeight: 600, background: showArchived ? 'rgba(139,92,246,0.15)' : 'var(--color-geo-surface-2)', color: showArchived ? '#a78bfa' : 'var(--color-geo-text-muted)', cursor: 'pointer', transition: 'all 0.2s' }}>
+                            <Archive size={16} /> {showArchived ? 'Ver Activas' : 'Archivo'}
+                        </button>
+                        {!showArchived && (
+                            <button onClick={() => { setForm(emptyOrder); setModal('create'); }} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 20px', borderRadius: 10, border: 'none', fontSize: 13, fontWeight: 600, background: 'var(--color-geo-primary)', color: '#fff', cursor: 'pointer' }}>
+                                <Plus size={16} /> Nueva OT
+                            </button>
+                        )}
                     </div>
                 </div>
 
-                <div className="glass-card" style={{ flex: 1, overflow: 'auto' }}>
-                    <table className="data-table">
-                        <thead><tr><th>ID</th><th>Título</th><th>Cliente</th><th>Técnico</th><th>Estado</th><th>Prioridad</th><th>Fecha</th><th>Acciones</th></tr></thead>
-                        <tbody>
-                            {filtered.map(o => {
-                                const p = priorityColors[o.priority] || priorityColors['media'];
-                                return (
-                                    <tr key={o.id} style={{ cursor: 'pointer', background: selected?.id === o.id ? 'rgba(59,130,246,0.06)' : undefined }} onClick={() => setSelected(o)}>
-                                        <td style={{ fontWeight: 600, color: 'var(--color-geo-text)' }}>{o.id}</td>
-                                        <td style={{ fontWeight: 500, color: 'var(--color-geo-text)', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis' }}>{o.title}</td>
-                                        <td>{o.client}</td>
-                                        <td>{getTechName(o.technicianId)}</td>
-                                        <td><span className={`badge ${statusMap[o.status]?.cls || 'badge-pending'}`}>{statusMap[o.status]?.label || o.status}</span></td>
-                                        <td><span style={{ padding: '3px 10px', borderRadius: 6, fontSize: 11, fontWeight: 600, background: p.bg, color: p.color }}>{o.priority}</span></td>
-                                        <td style={{ fontSize: 12 }}>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><Calendar size={12} /> {o.scheduledDate}</div>
-                                        </td>
-                                        <td>
-                                            <div style={{ display: 'flex', gap: 4 }} onClick={e => e.stopPropagation()}>
-                                                <button onClick={() => { setForm(o); setModal('edit'); }} style={{ width: 28, height: 28, borderRadius: 6, border: 'none', background: 'var(--color-geo-surface-2)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-geo-text-dim)' }}><Edit size={13} /></button>
-                                                <button onClick={() => setArchiveId(o.id)} style={{ width: 28, height: 28, borderRadius: 6, border: 'none', background: 'rgba(239,68,68,0.08)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#f87171' }}><Archive size={13} /></button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                );
-                            })}
-                        </tbody>
-                    </table>
-                </div>
+                {!showArchived && (
+                    <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
+                        <div style={{ flex: 1, position: 'relative', minWidth: 180 }}>
+                            <Search size={16} style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: 'var(--color-geo-text-dim)' }} />
+                            <input className="geo-input" placeholder="Buscar OT..." value={search} onChange={e => setSearch(e.target.value)} style={{ width: '100%', paddingLeft: 40 }} />
+                        </div>
+                        <div style={{ position: 'relative' }}>
+                            <Filter size={16} style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: 'var(--color-geo-text-dim)', pointerEvents: 'none' }} />
+                            <select className="geo-input" value={statusFilter} onChange={e => setStatusFilter(e.target.value)} style={{ paddingLeft: 40, paddingRight: 30, appearance: 'none', cursor: 'pointer', minWidth: 150 }}>
+                                <option value="all">Todos</option>
+                                <option value="pendiente">Pendiente</option>
+                                <option value="en-progreso">En Progreso</option>
+                                <option value="completada">Completada</option>
+                                <option value="cancelada">Cancelada</option>
+                            </select>
+                            <ChevronDown size={14} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--color-geo-text-dim)', pointerEvents: 'none' }} />
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <Calendar size={14} style={{ color: 'var(--color-geo-text-dim)' }} />
+                            <input className="geo-input" type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} style={{ width: 140, fontSize: 12 }} />
+                            <span style={{ color: 'var(--color-geo-text-dim)', fontSize: 12 }}>—</span>
+                            <input className="geo-input" type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} style={{ width: 140, fontSize: 12 }} />
+                            {(dateFrom || dateTo) && (
+                                <button onClick={() => { setDateFrom(''); setDateTo(''); }} style={{ border: 'none', background: 'none', color: '#f87171', cursor: 'pointer', fontSize: 11, fontWeight: 600, padding: '4px 8px' }}>✕</button>
+                            )}
+                        </div>
+                    </div>
+                )}
+
+                {/* Active orders table */}
+                {!showArchived && (
+                    <div className="glass-card" style={{ flex: 1, overflow: 'auto' }}>
+                        <table className="data-table">
+                            <thead><tr><th>ID</th><th>Título</th><th>Cliente</th><th>Técnico</th><th>Estado</th><th>Prioridad</th><th>Fecha</th><th>Acciones</th></tr></thead>
+                            <tbody>
+                                {filtered.map(o => {
+                                    const p = priorityColors[o.priority] || priorityColors['media'];
+                                    return (
+                                        <tr key={o.id} style={{ cursor: 'pointer', background: selected?.id === o.id ? 'rgba(59,130,246,0.06)' : undefined }} onClick={() => setSelected(o)}>
+                                            <td style={{ fontWeight: 600, color: 'var(--color-geo-text)' }}>{o.id}</td>
+                                            <td style={{ fontWeight: 500, color: 'var(--color-geo-text)', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis' }}>{o.title}</td>
+                                            <td>{o.client}</td>
+                                            <td>{getTechName(o.technicianId)}</td>
+                                            <td><span className={`badge ${statusMap[o.status]?.cls || 'badge-pending'}`}>{statusMap[o.status]?.label || o.status}</span></td>
+                                            <td><span style={{ padding: '3px 10px', borderRadius: 6, fontSize: 11, fontWeight: 600, background: p.bg, color: p.color }}>{o.priority}</span></td>
+                                            <td style={{ fontSize: 12 }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><Calendar size={12} /> {o.scheduledDate}</div>
+                                            </td>
+                                            <td>
+                                                <div style={{ display: 'flex', gap: 4 }} onClick={e => e.stopPropagation()}>
+                                                    <button onClick={() => { setForm(o); setModal('edit'); }} style={{ width: 28, height: 28, borderRadius: 6, border: 'none', background: 'var(--color-geo-surface-2)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-geo-text-dim)' }}><Edit size={13} /></button>
+                                                    <button onClick={() => setArchiveId(o.id)} style={{ width: 28, height: 28, borderRadius: 6, border: 'none', background: 'rgba(239,68,68,0.08)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#f87171' }}><Archive size={13} /></button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
+
+                {/* Archived orders table */}
+                {showArchived && (
+                    <div className="glass-card" style={{ flex: 1, overflow: 'auto' }}>
+                        {archivedOrders.length === 0 ? (
+                            <div style={{ textAlign: 'center', padding: 60, color: 'var(--color-geo-text-dim)' }}>
+                                <Archive size={40} style={{ marginBottom: 12, opacity: 0.3 }} />
+                                <div style={{ fontSize: 14, fontWeight: 600 }}>Sin órdenes archivadas</div>
+                                <div style={{ fontSize: 12, marginTop: 4 }}>Las órdenes archivadas aparecerán aquí</div>
+                            </div>
+                        ) : (
+                            <table className="data-table">
+                                <thead><tr><th>ID</th><th>Título</th><th>Cliente</th><th>Técnico</th><th>Estado</th><th>Fecha</th><th>Restaurar</th></tr></thead>
+                                <tbody>
+                                    {archivedOrders.map(o => (
+                                        <tr key={o.id} style={{ opacity: 0.7 }}>
+                                            <td style={{ fontWeight: 600, color: 'var(--color-geo-text)' }}>{o.id}</td>
+                                            <td style={{ fontWeight: 500, color: 'var(--color-geo-text)' }}>{o.title}</td>
+                                            <td>{o.client}</td>
+                                            <td>{getTechName(o.technicianId)}</td>
+                                            <td><span className={`badge ${statusMap[o.status]?.cls || 'badge-pending'}`}>{statusMap[o.status]?.label || o.status}</span></td>
+                                            <td style={{ fontSize: 12 }}><div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><Calendar size={12} /> {o.scheduledDate}</div></td>
+                                            <td>
+                                                <button onClick={() => handleUnarchive(o.id)} style={{ padding: '6px 14px', borderRadius: 6, border: 'none', background: 'rgba(16,185,129,0.1)', color: '#34d399', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Restaurar</button>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        )}
+                    </div>
+                )}
             </div>
 
             {/* Detail panel */}
-            {selected && (
+            {selected && !showArchived && (
                 <div className="glass-card animate-fade-in-up" style={{ width: 340, flexShrink: 0, padding: 24, overflow: 'auto' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
                         <div>
@@ -270,19 +369,30 @@ export default function OrdersPage() {
                         </select>
                     </FormField>
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 16px' }}>
-                    <FormField label="Latitud">
-                        <div style={{ position: 'relative' }}>
-                            <MapPin size={14} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--color-geo-text-dim)' }} />
-                            <input className="geo-input" type="number" step="0.0001" style={{ width: '100%', paddingLeft: 34 }} value={form.lat ?? 19.4326} onChange={e => setNum('lat', e.target.value)} placeholder="19.4326" />
+                {/* Map Picker */}
+                <div style={{ marginTop: 8, borderTop: '1px solid var(--color-geo-border)', paddingTop: 12 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, fontWeight: 700, color: 'var(--color-geo-text-dim)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                            <MapPin size={13} /> Ubicación
                         </div>
-                    </FormField>
-                    <FormField label="Longitud">
-                        <div style={{ position: 'relative' }}>
-                            <MapPin size={14} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--color-geo-text-dim)' }} />
-                            <input className="geo-input" type="number" step="0.0001" style={{ width: '100%', paddingLeft: 34 }} value={form.lng ?? -99.1332} onChange={e => setNum('lng', e.target.value)} placeholder="-99.1332" />
+                        <div style={{ fontSize: 11, color: 'var(--color-geo-text-muted)' }}>
+                            {(form.lat ?? 19.4326).toFixed(4)}, {(form.lng ?? -99.1332).toFixed(4)}
                         </div>
-                    </FormField>
+                    </div>
+                    <div style={{ height: 220, borderRadius: 12, overflow: 'hidden', border: '1px solid var(--color-geo-border)' }}>
+                        <MapContainer
+                            center={[form.lat ?? 19.4326, form.lng ?? -99.1332]}
+                            zoom={14}
+                            style={{ height: '100%', width: '100%' }}
+                            zoomControl={false}
+                        >
+                            <TileLayer url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" />
+                            <Marker position={[form.lat ?? 19.4326, form.lng ?? -99.1332]} icon={pinIcon} />
+                            <MapClickHandler onMove={(lat, lng) => setForm(f => ({ ...f, lat: Math.round(lat * 10000) / 10000, lng: Math.round(lng * 10000) / 10000 }))} />
+                            <RecenterMap lat={form.lat ?? 19.4326} lng={form.lng ?? -99.1332} />
+                        </MapContainer>
+                    </div>
+                    <p style={{ fontSize: 10, color: 'var(--color-geo-text-dim)', marginTop: 6, textAlign: 'center' }}>Haz clic en el mapa para seleccionar la ubicación</p>
                 </div>
                 <FormField label="Descripción"><textarea className="geo-input" style={{ width: '100%', minHeight: 70, resize: 'vertical' }} value={form.description || ''} onChange={e => set('description', e.target.value)} /></FormField>
             </Modal>

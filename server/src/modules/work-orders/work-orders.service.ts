@@ -19,8 +19,8 @@ export class WorkOrdersService {
         @InjectRepository(User) private readonly userRepo: Repository<User>,
     ) { }
 
-    findAll(tenantId: string, status?: string) {
-        const where: any = { tenantId };
+    findAll(tenantId: string, status?: string, archived?: boolean) {
+        const where: any = { tenantId, archived: archived ?? false };
         if (status && status !== 'all') where.status = status;
         return this.repo.find({ where });
     }
@@ -42,8 +42,13 @@ export class WorkOrdersService {
     }
 
     async archive(id: string, tenantId: string) {
-        await this.repo.update({ id, tenantId }, { status: 'archivada' });
+        await this.repo.update({ id, tenantId }, { archived: true });
         return { message: `WorkOrder ${id} archived` };
+    }
+
+    async unarchive(id: string, tenantId: string) {
+        await this.repo.update({ id, tenantId }, { archived: false });
+        return { message: `WorkOrder ${id} unarchived` };
     }
 
     // ── Self-assign ──
