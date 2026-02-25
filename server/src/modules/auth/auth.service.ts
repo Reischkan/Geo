@@ -35,6 +35,7 @@ export class AuthService {
             email: user.email,
             role: user.role,
             tenantId: user.tenantId,
+            technicianId: user.technicianId || '',
         };
 
         return {
@@ -44,6 +45,7 @@ export class AuthService {
                 email: user.email,
                 name: user.name,
                 role: user.role,
+                technicianId: user.technicianId || '',
             },
             tenant: {
                 id: tenant.id,
@@ -59,7 +61,7 @@ export class AuthService {
         if (!user) throw new UnauthorizedException();
         const tenant = await this.tenantRepo.findOne({ where: { id: user.tenantId } });
         return {
-            user: { id: user.id, email: user.email, name: user.name, role: user.role },
+            user: { id: user.id, email: user.email, name: user.name, role: user.role, technicianId: user.technicianId || '' },
             tenant: tenant ? { id: tenant.id, name: tenant.name, slug: tenant.slug, logoUrl: tenant.logoUrl } : null,
         };
     }

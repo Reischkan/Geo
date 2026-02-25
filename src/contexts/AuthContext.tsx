@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
 
-interface UserInfo { id: string; email: string; name: string; role: string; }
+interface UserInfo { id: string; email: string; name: string; role: string; technicianId?: string; }
 interface TenantInfo { id: string; name: string; slug: string; logoUrl: string; }
 interface AuthState {
     token: string | null;

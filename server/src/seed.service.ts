@@ -56,6 +56,9 @@ export class SeedService implements OnModuleInit {
             { id: 'U002', email: 'admin@geofield.mx', passwordHash: hash('admin123'), name: 'Admin Principal', role: 'admin', tenantId: T1, active: true },
             { id: 'U003', email: 'admin@geofield.co', passwordHash: hash('admin123'), name: 'Admin Colombia', role: 'admin', tenantId: T2, active: true },
             { id: 'U004', email: 'viewer@geofield.mx', passwordHash: hash('viewer123'), name: 'Visor MX', role: 'viewer', tenantId: T1, active: true },
+            { id: 'U005', email: 'carlos@geofield.mx', passwordHash: hash('tech123'), name: 'Carlos Méndez', role: 'tecnico', technicianId: 'T001', tenantId: T1, active: true },
+            { id: 'U006', email: 'maria@geofield.mx', passwordHash: hash('tech123'), name: 'María González', role: 'tecnico', technicianId: 'T002', tenantId: T1, active: true },
+            { id: 'U007', email: 'roberto@geofield.mx', passwordHash: hash('tech123'), name: 'Roberto Silva', role: 'tecnico', technicianId: 'T003', tenantId: T1, active: true },
         ]);
 
         // Technicians (tenant-mx)

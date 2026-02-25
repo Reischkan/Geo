@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Search, Filter, ChevronDown, Plus, Edit, Archive, Calendar, Clock, MapPin } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Search, Filter, ChevronDown, Plus, Edit, Archive, Calendar, Clock, MapPin, MessageSquare, Send } from 'lucide-react';
 import { useApi } from '../hooks/useApi';
 import { authFetch } from '../hooks/authFetch';
 import { useToast } from '../components/Toast';
@@ -14,6 +14,7 @@ interface WorkOrder {
     lat: number; lng: number;
 }
 interface Tech { id: string; name: string; avatar: string; }
+interface OrderComment { id: string; orderId: string; authorId: string; authorName: string; text: string; createdAt: string; }
 
 const statusMap: Record<string, { label: string; cls: string }> = {
     'pendiente': { label: 'Pendiente', cls: 'badge-pending' },
@@ -45,6 +46,31 @@ export default function OrdersPage() {
     const [modal, setModal] = useState<'create' | 'edit' | null>(null);
     const [form, setForm] = useState<Partial<WorkOrder>>(emptyOrder);
     const [archiveId, setArchiveId] = useState<string | null>(null);
+    const [comments, setComments] = useState<OrderComment[]>([]);
+    const [newComment, setNewComment] = useState('');
+
+    // Load comments when an order is selected
+    useEffect(() => {
+        if (!selected) { setComments([]); return; }
+        authFetch(`/api/work-orders/${selected.id}/comments`)
+            .then(r => r.json())
+            .then(setComments)
+            .catch(() => setComments([]));
+    }, [selected?.id]);
+
+    const handleAddComment = async () => {
+        if (!newComment.trim() || !selected) return;
+        const res = await authFetch(`/api/work-orders/${selected.id}/comments`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text: newComment.trim() }),
+        });
+        if (res.ok) {
+            const comment = await res.json();
+            setComments(prev => [...prev, comment]);
+            setNewComment('');
+        }
+    };
 
     const filtered = orders.filter(o => {
         const matchSearch = search === '' || o.title.toLowerCase().includes(search.toLowerCase()) || o.client.toLowerCase().includes(search.toLowerCase()) || o.id.toLowerCase().includes(search.toLowerCase());
@@ -167,6 +193,52 @@ export default function OrdersPage() {
                         <BtnDanger onClick={() => setArchiveId(selected.id)} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                             <Archive size={14} /> Archivar
                         </BtnDanger>
+                    </div>
+
+                    {/* Comments Section */}
+                    <div style={{ marginTop: 20, borderTop: '1px solid var(--color-geo-border)', paddingTop: 16 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12, fontSize: 11, fontWeight: 600, color: 'var(--color-geo-text-dim)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                            <MessageSquare size={13} /> Comentarios ({comments.length})
+                        </div>
+
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 200, overflowY: 'auto', marginBottom: 10 }}>
+                            {comments.length === 0 && (
+                                <div style={{ textAlign: 'center', padding: 12, color: 'var(--color-geo-text-dim)', fontSize: 12 }}>Sin comentarios</div>
+                            )}
+                            {comments.map(c => (
+                                <div key={c.id} style={{ padding: '8px 10px', background: 'var(--color-geo-surface-2)', borderRadius: 8, fontSize: 12 }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 3 }}>
+                                        <span style={{ fontWeight: 700, color: 'var(--color-geo-primary-light)' }}>{c.authorName}</span>
+                                        <span style={{ fontSize: 10, color: 'var(--color-geo-text-dim)' }}>{new Date(c.createdAt).toLocaleString('es-MX', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
+                                    </div>
+                                    <div style={{ color: 'var(--color-geo-text-muted)', lineHeight: 1.4 }}>{c.text}</div>
+                                </div>
+                            ))}
+                        </div>
+
+                        <div style={{ display: 'flex', gap: 6 }}>
+                            <input
+                                className="geo-input"
+                                placeholder="Escribir comentario..."
+                                value={newComment}
+                                onChange={e => setNewComment(e.target.value)}
+                                onKeyDown={e => e.key === 'Enter' && handleAddComment()}
+                                style={{ flex: 1, fontSize: 12, padding: '8px 10px' }}
+                            />
+                            <button
+                                onClick={handleAddComment}
+                                disabled={!newComment.trim()}
+                                style={{
+                                    width: 34, height: 34, borderRadius: 8, border: 'none',
+                                    background: newComment.trim() ? 'var(--color-geo-primary)' : 'var(--color-geo-surface-2)',
+                                    color: '#fff', cursor: newComment.trim() ? 'pointer' : 'default',
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                    transition: 'all 0.2s',
+                                }}
+                            >
+                                <Send size={14} />
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}

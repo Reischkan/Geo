@@ -15,7 +15,10 @@ export class User {
     name: string;
 
     @Column({ default: 'admin' })
-    role: string; // super-admin | admin | viewer
+    role: string; // super-admin | admin | viewer | tecnico
+
+    @Column({ nullable: true, default: '' })
+    technicianId: string;
 
     @Column()
     tenantId: string;

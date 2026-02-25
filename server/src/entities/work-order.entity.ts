@@ -38,6 +38,9 @@ export class WorkOrder {
     @Column({ default: '' })
     description: string;
 
+    @Column({ default: '[]' })
+    materials: string; // JSON: [{inventoryId, name, qty}]
+
     @Column('float', { default: 19.43 })
     lat: number;
 
