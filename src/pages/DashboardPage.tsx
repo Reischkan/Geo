@@ -72,7 +72,7 @@ export default function DashboardPage() {
             <div style={{ marginBottom: 24 }}>
                 <h1 style={{ fontSize: 24, fontWeight: 700, letterSpacing: '-0.02em' }}>Dashboard</h1>
                 <p style={{ fontSize: 14, color: 'var(--color-geo-text-muted)', marginTop: 4 }}>
-                    Resumen operativo — 23 de Febrero 2026
+                    Resumen operativo — {new Date().toLocaleDateString('es-MX', { day: 'numeric', month: 'long', year: 'numeric' })}
                 </p>
             </div>
 

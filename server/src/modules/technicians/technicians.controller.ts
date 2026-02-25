@@ -8,6 +8,9 @@ export class TechniciansController {
     @Get()
     findAll(@Request() req: any) { return this.svc.findAll(req.user.tenantId); }
 
+    @Get('stats')
+    getStats(@Request() req: any) { return this.svc.getStats(req.user.tenantId); }
+
     // ── Self location update (must be before :id) ──
     @Patch('me/location')
     updateMyLocation(@Body() body: { lat: number; lng: number }, @Request() req: any) {

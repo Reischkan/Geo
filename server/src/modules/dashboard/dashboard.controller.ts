@@ -12,7 +12,7 @@ export class DashboardController {
     getActivity(@Request() req: any) { return this.svc.getActivity(req.user.tenantId); }
 
     @Get('revenue-chart')
-    getRevenueChart() { return this.svc.getRevenueChart(); }
+    getRevenueChart(@Request() req: any) { return this.svc.getRevenueChart(req.user.tenantId); }
 
     @Get('status-breakdown')
     getStatusBreakdown(@Request() req: any) { return this.svc.getStatusBreakdown(req.user.tenantId); }

@@ -1,8 +1,11 @@
+import { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useApi } from '../../hooks/useApi';
-import { LogOut, Star, Clock, CheckCircle, Briefcase } from 'lucide-react';
+import { authFetch } from '../../hooks/authFetch';
+import { LogOut, Star, Clock, CheckCircle, Briefcase, Package } from 'lucide-react';
 
 interface Tech { id: string; name: string; avatar: string; role: string; status: string; phone: string; completedOrders: number; rating: number; hoursLogged: number; }
+interface TechStats { technicianId: string; completedOrders: number; totalOrders: number; rating: number; hoursLogged: number; email: string | null; hasCredentials: boolean; }
 
 export default function TechProfilePage() {
     const { user, tenant, logout } = useAuth();
@@ -10,7 +13,35 @@ export default function TechProfilePage() {
     const { data: techs } = useApi<Tech[]>('/api/technicians', []);
     const tech = techs.find(t => t.id === techId);
 
+    const [stats, setStats] = useState<TechStats | null>(null);
+    const [myOrders, setMyOrders] = useState<any[]>([]);
+
+    useEffect(() => {
+        // Fetch real stats
+        authFetch('/api/technicians/stats')
+            .then(r => r.json())
+            .then((all: TechStats[]) => {
+                const mine = all.find(s => s.technicianId === techId);
+                if (mine) setStats(mine);
+            }).catch(() => { });
+
+        // Fetch my orders for the detail breakdown
+        authFetch('/api/work-orders')
+            .then(r => r.json())
+            .then((orders: any[]) => {
+                setMyOrders(orders.filter(o => o.technicianId === techId));
+            }).catch(() => { });
+    }, [techId]);
+
     const initials = user?.name?.split(' ').map(n => n[0]).join('').slice(0, 2) || '?';
+    const completed = stats?.completedOrders ?? tech?.completedOrders ?? 0;
+    const total = stats?.totalOrders ?? 0;
+    const rating = stats?.rating ?? tech?.rating ?? 0;
+    const hours = stats?.hoursLogged ?? tech?.hoursLogged ?? 0;
+    const performance = total > 0 ? Math.round((completed / total) * 100) : 0;
+
+    const activeOrders = myOrders.filter(o => o.status !== 'completada' && o.status !== 'cancelada');
+    const completedOrders = myOrders.filter(o => o.status === 'completada');
 
     return (
         <div className="tech-animate" style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
@@ -30,21 +61,53 @@ export default function TechProfilePage() {
                     <span className="tech-stat-label" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                         <CheckCircle size={14} color="#10b981" /> Órdenes Completadas
                     </span>
-                    <span className="tech-stat-value">{tech?.completedOrders || 0}</span>
+                    <span className="tech-stat-value">{completed} / {total}</span>
                 </div>
                 <div className="tech-stat-row">
                     <span className="tech-stat-label" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                         <Star size={14} color="#fbbf24" /> Calificación
                     </span>
-                    <span className="tech-stat-value">⭐ {tech?.rating?.toFixed(1) || '0.0'}</span>
+                    <span className="tech-stat-value">⭐ {rating.toFixed(1)}</span>
                 </div>
                 <div className="tech-stat-row">
                     <span className="tech-stat-label" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <Clock size={14} color="#818cf8" /> Horas Registradas
+                        <Clock size={14} color="#818cf8" /> Horas en Campo
                     </span>
-                    <span className="tech-stat-value">{tech?.hoursLogged || 0}h</span>
+                    <span className="tech-stat-value">{hours}h</span>
+                </div>
+                <div className="tech-stat-row" style={{ borderBottom: 'none' }}>
+                    <span className="tech-stat-label" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <Package size={14} color="#f59e0b" /> Rendimiento
+                    </span>
+                    <span className="tech-stat-value" style={{ color: performance >= 80 ? '#10b981' : performance >= 50 ? '#f59e0b' : '#ef4444' }}>{performance}%</span>
                 </div>
             </div>
+
+            {/* Active Orders */}
+            {activeOrders.length > 0 && (
+                <div className="tech-card">
+                    <div className="tech-section-title">Órdenes Activas ({activeOrders.length})</div>
+                    {activeOrders.map(o => (
+                        <div key={o.id} className="tech-stat-row">
+                            <span className="tech-stat-label" style={{ fontSize: 13 }}>{o.title}</span>
+                            <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 6, background: 'rgba(59,130,246,0.15)', color: '#60a5fa', fontWeight: 600 }}>{o.status}</span>
+                        </div>
+                    ))}
+                </div>
+            )}
+
+            {/* Recent Completed */}
+            {completedOrders.length > 0 && (
+                <div className="tech-card">
+                    <div className="tech-section-title">Últimas Completadas ({completedOrders.length})</div>
+                    {completedOrders.slice(0, 5).map(o => (
+                        <div key={o.id} className="tech-stat-row">
+                            <span className="tech-stat-label" style={{ fontSize: 13 }}>{o.title}</span>
+                            <span style={{ fontSize: 11, color: '#64748b' }}>{o.scheduledDate}</span>
+                        </div>
+                    ))}
+                </div>
+            )}
 
             {/* Company */}
             <div className="tech-card">
