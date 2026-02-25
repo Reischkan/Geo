@@ -4,6 +4,9 @@ import { Repository } from 'typeorm';
 import { WorkOrder } from '../../entities/work-order.entity';
 import { OrderComment } from '../../entities/order-comment.entity';
 import { InventoryItem } from '../../entities/inventory-item.entity';
+import { MaterialLog } from '../../entities/material-log.entity';
+import { Technician } from '../../entities/technician.entity';
+import { User } from '../../entities/user.entity';
 
 @Injectable()
 export class WorkOrdersService {
@@ -11,6 +14,9 @@ export class WorkOrdersService {
         @InjectRepository(WorkOrder) private readonly repo: Repository<WorkOrder>,
         @InjectRepository(OrderComment) private readonly commentRepo: Repository<OrderComment>,
         @InjectRepository(InventoryItem) private readonly inventoryRepo: Repository<InventoryItem>,
+        @InjectRepository(MaterialLog) private readonly logRepo: Repository<MaterialLog>,
+        @InjectRepository(Technician) private readonly techRepo: Repository<Technician>,
+        @InjectRepository(User) private readonly userRepo: Repository<User>,
     ) { }
 
     findAll(tenantId: string, status?: string) {
@@ -66,10 +72,30 @@ export class WorkOrdersService {
     }
 
     // ── Materials consumption ──
-    async consumeMaterials(orderId: string, materials: { inventoryId: string; name: string; qty: number }[], tenantId: string) {
+    async consumeMaterials(
+        orderId: string,
+        materials: { inventoryId: string; name: string; qty: number }[],
+        technicianId: string,
+        tenantId: string,
+    ) {
         const order = await this.findOne(orderId, tenantId);
 
-        // Merge with existing materials
+        // Resolve technician name
+        let techName = technicianId;
+        const tech = await this.techRepo.findOneBy({ id: technicianId });
+        if (tech) {
+            techName = tech.name;
+        } else {
+            // Fallback: look up User entity by userId or technicianId
+            const user = await this.userRepo.findOneBy({ id: technicianId });
+            if (user) techName = user.name;
+            else {
+                const userByTech = await this.userRepo.findOneBy({ technicianId });
+                if (userByTech) techName = userByTech.name;
+            }
+        }
+
+        // Merge with existing materials on the order
         const existing: any[] = JSON.parse(order.materials || '[]');
         const merged = [...existing];
         for (const mat of materials) {
@@ -80,15 +106,39 @@ export class WorkOrdersService {
         order.materials = JSON.stringify(merged);
         await this.repo.save(order);
 
-        // Deduct from inventory
+        // Deduct from inventory & create log entries
         for (const mat of materials) {
             const item = await this.inventoryRepo.findOneBy({ id: mat.inventoryId, tenantId });
             if (item) {
                 item.vehicleQty = Math.max(0, item.vehicleQty - mat.qty);
                 await this.inventoryRepo.save(item);
             }
+
+            // Log each consumption event
+            const log = this.logRepo.create({
+                id: `ML-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+                inventoryId: mat.inventoryId,
+                inventoryName: mat.name,
+                qty: mat.qty,
+                orderId: order.id,
+                orderTitle: order.title,
+                technicianId,
+                technicianName: techName,
+                consumedAt: new Date().toISOString(),
+                tenantId,
+            });
+            await this.logRepo.save(log);
         }
 
         return order;
+    }
+
+    // ── Material logs ──
+    async getMaterialLogs(tenantId: string) {
+        return this.logRepo.find({ where: { tenantId }, order: { consumedAt: 'DESC' } });
+    }
+
+    async getMaterialLogsByItem(inventoryId: string, tenantId: string) {
+        return this.logRepo.find({ where: { inventoryId, tenantId }, order: { consumedAt: 'DESC' } });
     }
 }

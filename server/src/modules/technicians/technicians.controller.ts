@@ -8,6 +8,14 @@ export class TechniciansController {
     @Get()
     findAll(@Request() req: any) { return this.svc.findAll(req.user.tenantId); }
 
+    // ── Self location update (must be before :id) ──
+    @Patch('me/location')
+    updateMyLocation(@Body() body: { lat: number; lng: number }, @Request() req: any) {
+        const techId = req.user.technicianId;
+        if (!techId) return { message: 'No technician linked' };
+        return this.svc.update(techId, { lat: body.lat, lng: body.lng }, req.user.tenantId);
+    }
+
     @Get(':id')
     findOne(@Param('id') id: string, @Request() req: any) { return this.svc.findOne(id, req.user.tenantId); }
 

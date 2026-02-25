@@ -4,6 +4,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useApi } from '../../hooks/useApi';
 import { authFetch } from '../../hooks/authFetch';
 import { useToast } from '../../components/Toast';
+import { sendLocation } from '../../hooks/sendLocation';
 import { ArrowLeft, MapPin, Clock, User, Calendar, Package, MessageSquare, Send, Navigation, CheckCircle, Play, Wrench, UserPlus, RotateCcw } from 'lucide-react';
 
 interface WorkOrder {
@@ -79,6 +80,7 @@ export default function TechOrderDetailPage() {
             body: JSON.stringify({ status: flow.next }),
         });
         toast('success', `Estado cambiado a: ${flow.next}`);
+        sendLocation();
         refetch();
         setSaving(false);
     };
@@ -91,6 +93,7 @@ export default function TechOrderDetailPage() {
             body: JSON.stringify({ status: 'en-servicio' }),
         });
         toast('success', 'Orden reabierta — estado: en servicio');
+        sendLocation();
         refetch();
         setSaving(false);
     };

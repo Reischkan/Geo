@@ -1,6 +1,8 @@
+import { useEffect } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { Home, ClipboardList, User } from 'lucide-react';
+import { sendLocation } from '../hooks/sendLocation';
 import '../tech.css';
 
 const navItems = [
@@ -13,6 +15,15 @@ export default function TechShell() {
     const { user, tenant } = useAuth();
     const location = useLocation();
     const navigate = useNavigate();
+
+    // Send location on mount, every 60s, and on route changes
+    useEffect(() => {
+        sendLocation();
+        const interval = setInterval(sendLocation, 60_000);
+        return () => clearInterval(interval);
+    }, []);
+
+    useEffect(() => { sendLocation(); }, [location.pathname]);
 
     return (
         <div className="tech-shell">

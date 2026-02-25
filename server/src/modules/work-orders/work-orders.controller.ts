@@ -8,6 +8,14 @@ export class WorkOrdersController {
     @Get()
     findAll(@Request() req: any, @Query('status') status?: string) { return this.svc.findAll(req.user.tenantId, status); }
 
+    @Get('material-logs')
+    getMaterialLogs(@Request() req: any) { return this.svc.getMaterialLogs(req.user.tenantId); }
+
+    @Get('material-logs/:inventoryId')
+    getMaterialLogsByItem(@Param('inventoryId') inventoryId: string, @Request() req: any) {
+        return this.svc.getMaterialLogsByItem(inventoryId, req.user.tenantId);
+    }
+
     @Get(':id')
     findOne(@Param('id') id: string, @Request() req: any) { return this.svc.findOne(id, req.user.tenantId); }
 
@@ -40,6 +48,6 @@ export class WorkOrdersController {
     // ── Materials consumption ──
     @Patch(':id/materials')
     consumeMaterials(@Param('id') id: string, @Body() body: { materials: any[] }, @Request() req: any) {
-        return this.svc.consumeMaterials(id, body.materials, req.user.tenantId);
+        return this.svc.consumeMaterials(id, body.materials, req.user.technicianId || req.user.userId, req.user.tenantId);
     }
 }

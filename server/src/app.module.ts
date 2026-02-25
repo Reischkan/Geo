@@ -11,6 +11,7 @@ import { AuditLog } from './entities/audit-log.entity';
 import { Tenant } from './entities/tenant.entity';
 import { User } from './entities/user.entity';
 import { OrderComment } from './entities/order-comment.entity';
+import { MaterialLog } from './entities/material-log.entity';
 import { TechniciansModule } from './modules/technicians/technicians.module';
 import { WorkOrdersModule } from './modules/work-orders/work-orders.module';
 import { ProjectsModule } from './modules/projects/projects.module';
@@ -27,10 +28,10 @@ import { SeedService } from './seed.service';
         TypeOrmModule.forRoot({
             type: 'better-sqlite3',
             database: 'geofield.db',
-            entities: [Technician, WorkOrder, Project, InventoryItem, CalendarEvent, ActivityFeedItem, Client, AuditLog, Tenant, User, OrderComment],
+            entities: [Technician, WorkOrder, Project, InventoryItem, CalendarEvent, ActivityFeedItem, Client, AuditLog, Tenant, User, OrderComment, MaterialLog],
             synchronize: true,
         }),
-        TypeOrmModule.forFeature([Technician, WorkOrder, Project, InventoryItem, CalendarEvent, ActivityFeedItem, Client, AuditLog, Tenant, User, OrderComment]),
+        TypeOrmModule.forFeature([Technician, WorkOrder, Project, InventoryItem, CalendarEvent, ActivityFeedItem, Client, AuditLog, Tenant, User, OrderComment, MaterialLog]),
         TechniciansModule,
         WorkOrdersModule,
         ProjectsModule,
