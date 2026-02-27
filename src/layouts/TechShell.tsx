@@ -1,13 +1,14 @@
 import { useEffect } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { Home, ClipboardList, User } from 'lucide-react';
+import { Home, ClipboardList, User, Package } from 'lucide-react';
 import { sendLocation } from '../hooks/sendLocation';
 import '../tech.css';
 
 const navItems = [
     { path: '/tech', icon: Home, label: 'Inicio' },
     { path: '/tech/ordenes', icon: ClipboardList, label: 'Órdenes' },
+    { path: '/tech/inventario', icon: Package, label: 'Inventario' },
     { path: '/tech/perfil', icon: User, label: 'Perfil' },
 ];
 

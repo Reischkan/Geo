@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Star, Phone, MapPin, Clock, CheckCircle, TrendingUp, Plus, Edit, UserX, Search, Mail, Key } from 'lucide-react';
+import { Star, Phone, MapPin, Clock, CheckCircle, TrendingUp, Plus, Edit, UserX, Search, Mail, Key, Package } from 'lucide-react';
 import { useApi } from '../hooks/useApi';
 import { authFetch } from '../hooks/authFetch';
 import { useToast } from '../components/Toast';
@@ -11,6 +11,10 @@ import type { Technician } from '../data/mock';
 interface TechStats {
     technicianId: string; completedOrders: number; totalOrders: number;
     rating: number; hoursLogged: number; email: string | null; hasCredentials: boolean;
+}
+interface TechAssignment {
+    id: number; technicianId: string; inventoryId: string; qty: number;
+    technicianName: string; inventoryName: string; inventorySku: string; unit: string;
 }
 
 const statusLabels: Record<string, string> = { 'en-ruta': 'En Ruta', 'en-servicio': 'En Servicio', 'disponible': 'Disponible', 'desconectado': 'Desconectado' };
@@ -35,6 +39,14 @@ export default function TechniciansPage() {
     const [modal, setModal] = useState<'create' | 'edit' | null>(null);
     const [form, setForm] = useState<TechForm>(emptyTech);
     const [deactivateId, setDeactivateId] = useState<string | null>(null);
+    const [assignments, setAssignments] = useState<TechAssignment[]>([]);
+
+    useEffect(() => {
+        authFetch('/api/inventory/assignments')
+            .then(r => r.json())
+            .then(setAssignments)
+            .catch(() => { });
+    }, []);
     const [stats, setStats] = useState<TechStats[]>([]);
 
     // Load real stats
@@ -158,6 +170,29 @@ export default function TechniciansPage() {
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}><span style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-geo-text-dim)', display: 'flex', alignItems: 'center', gap: 4 }}><TrendingUp size={12} /> Rendimiento</span><span style={{ fontSize: 11, fontWeight: 700 }}>{performance}%</span></div>
                                     <div style={{ height: 5, borderRadius: 3, background: 'var(--color-geo-surface-3)', overflow: 'hidden' }}><div style={{ height: '100%', borderRadius: 3, width: `${performance}%`, background: gradients[i % gradients.length], transition: 'width 1s ease' }} /></div>
                                 </div>
+
+                                {/* Inventory assigned */}
+                                {(() => {
+                                    const techAssigns = assignments.filter(a => a.technicianId === tech.id);
+                                    return (
+                                        <div style={{ marginTop: 14 }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, fontWeight: 700, color: 'var(--color-geo-text-dim)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>
+                                                <Package size={11} /> Inventario Asignado
+                                            </div>
+                                            {techAssigns.length === 0 ? (
+                                                <div style={{ fontSize: 11, color: 'var(--color-geo-text-dim)', fontStyle: 'italic' }}>Sin material asignado</div>
+                                            ) : (
+                                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                                                    {techAssigns.map(a => (
+                                                        <span key={a.id} style={{ padding: '3px 8px', borderRadius: 6, fontSize: 10, fontWeight: 600, background: 'rgba(129,140,248,0.1)', color: '#818cf8', whiteSpace: 'nowrap' }}>
+                                                            {a.inventoryName} ×{a.qty}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                })()}
                             </div>
                         </div>
                     );

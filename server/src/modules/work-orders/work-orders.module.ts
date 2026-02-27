@@ -6,11 +6,12 @@ import { InventoryItem } from '../../entities/inventory-item.entity';
 import { MaterialLog } from '../../entities/material-log.entity';
 import { Technician } from '../../entities/technician.entity';
 import { User } from '../../entities/user.entity';
+import { TechInventory } from '../../entities/tech-inventory.entity';
 import { WorkOrdersController } from './work-orders.controller';
 import { WorkOrdersService } from './work-orders.service';
 
 @Module({
-    imports: [TypeOrmModule.forFeature([WorkOrder, OrderComment, InventoryItem, MaterialLog, Technician, User])],
+    imports: [TypeOrmModule.forFeature([WorkOrder, OrderComment, InventoryItem, MaterialLog, Technician, User, TechInventory])],
     controllers: [WorkOrdersController],
     providers: [WorkOrdersService],
 })

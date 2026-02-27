@@ -16,4 +16,29 @@ export class InventoryController {
 
     @Delete(':id')
     remove(@Param('id') id: string, @Request() req: any) { return this.svc.remove(id, req.user.tenantId); }
+
+    // ── Tech Inventory Assignment ──
+
+    @Get('assignments')
+    getAssignments(@Request() req: any) { return this.svc.getAssignments(req.user.tenantId); }
+
+    @Post('assign')
+    assign(@Body() body: { technicianId: string; inventoryId: string; qty: number }, @Request() req: any) {
+        return this.svc.assign(body.technicianId, body.inventoryId, body.qty, req.user.tenantId);
+    }
+
+    @Post('remove-assignment')
+    removeAssignment(@Body() body: { technicianId: string; inventoryId: string }, @Request() req: any) {
+        return this.svc.removeAssignment(body.technicianId, body.inventoryId, req.user.tenantId);
+    }
+
+    @Post('return')
+    returnToWarehouse(@Body() body: { technicianId: string; inventoryId: string; qty: number }, @Request() req: any) {
+        return this.svc.returnToWarehouse(body.technicianId, body.inventoryId, body.qty, req.user.tenantId);
+    }
+
+    @Get('my')
+    getMyInventory(@Request() req: any) {
+        return this.svc.getMyInventory(req.user.technicianId, req.user.tenantId);
+    }
 }

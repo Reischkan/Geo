@@ -14,7 +14,7 @@ interface WorkOrder {
     lat: number; lng: number; materials: string;
 }
 interface InventoryItem {
-    id: string; name: string; sku: string; category: string; vehicleQty: number; unit: string;
+    inventoryId: string; assignmentId: number; name: string; sku: string; category: string; qty: number; unit: string; unitCost: number;
 }
 interface Comment {
     id: string; orderId: string; authorId: string; authorName: string; text: string; createdAt: string;
@@ -44,7 +44,8 @@ export default function TechOrderDetailPage() {
     const { toast } = useToast();
 
     const { data: order, refetch } = useApi<WorkOrder>(`/api/work-orders/${id}`, null as any);
-    const { data: inventory } = useApi<InventoryItem[]>('/api/inventory', []);
+    const { data: inventory, refetch: refetchInventory } = useApi<InventoryItem[]>('/api/inventory/my', []);
+    const availableInventory = inventory.filter(i => i.qty > 0);
     const [comments, setComments] = useState<Comment[]>([]);
     const [newComment, setNewComment] = useState('');
     const [showMaterials, setShowMaterials] = useState(false);
@@ -122,14 +123,16 @@ export default function TechOrderDetailPage() {
 
     const toggleMaterial = (item: InventoryItem) => {
         setSelectedMaterials(prev => {
-            const exists = prev.find(m => m.inventoryId === item.id);
-            if (exists) return prev.filter(m => m.inventoryId !== item.id);
-            return [...prev, { inventoryId: item.id, name: item.name, qty: 1 }];
+            const exists = prev.find(m => m.inventoryId === item.inventoryId);
+            if (exists) return prev.filter(m => m.inventoryId !== item.inventoryId);
+            return [...prev, { inventoryId: item.inventoryId, name: item.name, qty: 1 }];
         });
     };
 
     const updateMaterialQty = (inventoryId: string, qty: number) => {
-        setSelectedMaterials(prev => prev.map(m => m.inventoryId === inventoryId ? { ...m, qty: Math.max(1, qty) } : m));
+        const item = inventory.find(i => i.inventoryId === inventoryId);
+        const max = item ? item.qty : 999;
+        setSelectedMaterials(prev => prev.map(m => m.inventoryId === inventoryId ? { ...m, qty: Math.max(1, Math.min(qty, max)) } : m));
     };
 
     const handleConsumeMaterials = async () => {
@@ -144,6 +147,7 @@ export default function TechOrderDetailPage() {
         setSelectedMaterials([]);
         setShowMaterials(false);
         refetch();
+        refetchInventory();
         setSaving(false);
     };
 
@@ -226,11 +230,12 @@ export default function TechOrderDetailPage() {
 
                     {showMaterials && (
                         <div className="tech-card" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                            <div className="tech-section-title">Seleccionar del Inventario</div>
-                            {inventory.map(item => {
-                                const selected = selectedMaterials.find(m => m.inventoryId === item.id);
+                            <div className="tech-section-title">Mi Material Disponible</div>
+                            {availableInventory.length === 0 && <div style={{ textAlign: 'center', padding: 16, color: '#475569', fontSize: 13 }}>No tienes material disponible</div>}
+                            {availableInventory.map(item => {
+                                const selected = selectedMaterials.find(m => m.inventoryId === item.inventoryId);
                                 return (
-                                    <div key={item.id} style={{
+                                    <div key={item.inventoryId} style={{
                                         display: 'flex', alignItems: 'center', gap: 10,
                                         padding: '10px 12px', borderRadius: 10,
                                         background: selected ? 'rgba(129,140,248,0.1)' : 'rgba(255,255,255,0.02)',
@@ -250,17 +255,17 @@ export default function TechOrderDetailPage() {
                                         </div>
                                         <div style={{ flex: 1 }}>
                                             <div style={{ fontSize: 13, fontWeight: 600 }}>{item.name}</div>
-                                            <div style={{ fontSize: 11, color: '#64748b' }}>{item.sku} · {item.vehicleQty} {item.unit} en vehículo</div>
+                                            <div style={{ fontSize: 11, color: item.qty <= 2 ? '#f87171' : '#34d399' }}>{item.sku} · <strong>{item.qty}</strong> {item.unit} disponibles</div>
                                         </div>
                                         {selected && (
                                             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }} onClick={e => e.stopPropagation()}>
                                                 <button
-                                                    onClick={() => updateMaterialQty(item.id, (selected.qty || 1) - 1)}
+                                                    onClick={() => updateMaterialQty(item.inventoryId, (selected.qty || 1) - 1)}
                                                     style={{ width: 28, height: 28, borderRadius: 6, border: '1px solid #334155', background: 'transparent', color: '#e2e8f0', cursor: 'pointer', fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                                                 >−</button>
                                                 <span style={{ fontSize: 14, fontWeight: 700, minWidth: 20, textAlign: 'center' }}>{selected.qty}</span>
                                                 <button
-                                                    onClick={() => updateMaterialQty(item.id, (selected.qty || 1) + 1)}
+                                                    onClick={() => updateMaterialQty(item.inventoryId, (selected.qty || 1) + 1)}
                                                     style={{ width: 28, height: 28, borderRadius: 6, border: '1px solid #334155', background: 'transparent', color: '#e2e8f0', cursor: 'pointer', fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                                                 >+</button>
                                             </div>

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Search, AlertTriangle, Package, Truck, Plus, Edit, Trash2, Warehouse, History, User, ClipboardList, ChevronRight, X } from 'lucide-react';
+import { Search, AlertTriangle, Package, Truck, Plus, Edit, Trash2, History, User, ClipboardList, ChevronRight, X, UserPlus, ChevronDown, ChevronUp, Users, RotateCcw } from 'lucide-react';
 import { useApi } from '../hooks/useApi';
 import { authFetch } from '../hooks/authFetch';
 import { useToast } from '../components/Toast';
@@ -16,6 +16,11 @@ interface MaterialLogEntry {
     orderId: string; orderTitle: string; technicianId: string; technicianName: string;
     consumedAt: string;
 }
+interface TechAssignment {
+    id: number; technicianId: string; inventoryId: string; qty: number;
+    technicianName: string; inventoryName: string; inventorySku: string; unit: string;
+}
+interface Tech { id: string; name: string; avatar: string; }
 
 const emptyItem: Partial<Item> = {
     name: '', sku: '', category: 'Herramientas', vehicleQty: 0, warehouseQty: 0,
@@ -24,6 +29,7 @@ const emptyItem: Partial<Item> = {
 
 export default function InventoryPage() {
     const { data: items, refetch } = useApi<Item[]>('/api/inventory', []);
+    const { data: techs } = useApi<Tech[]>('/api/technicians', []);
     const { toast } = useToast();
     const [search, setSearch] = useState('');
     const [catFilter, setCatFilter] = useState('all');
@@ -33,18 +39,33 @@ export default function InventoryPage() {
 
     // Consumption log state
     const [logs, setLogs] = useState<MaterialLogEntry[]>([]);
-    const [logsLoading, setLogsLoading] = useState(false);
     const [selectedItem, setSelectedItem] = useState<Item | null>(null);
     const [itemLogs, setItemLogs] = useState<MaterialLogEntry[]>([]);
+    const [showConsumption, setShowConsumption] = useState(false);
+
+    // Assignment state
+    const [assignments, setAssignments] = useState<TechAssignment[]>([]);
+    const [assignModal, setAssignModal] = useState(false);
+    const [assignTechId, setAssignTechId] = useState('');
+    const [assignItemId, setAssignItemId] = useState('');
+    const [assignQty, setAssignQty] = useState(1);
 
     // Load all logs
     useEffect(() => {
-        setLogsLoading(true);
         authFetch('/api/work-orders/material-logs')
             .then(r => r.json())
-            .then(d => { setLogs(d); setLogsLoading(false); })
-            .catch(() => setLogsLoading(false));
+            .then(d => setLogs(d))
+            .catch(() => { });
     }, []);
+
+    // Load assignments
+    const loadAssignments = () => {
+        authFetch('/api/inventory/assignments')
+            .then(r => r.json())
+            .then(setAssignments)
+            .catch(() => { });
+    };
+    useEffect(loadAssignments, []);
 
     // Load per-item logs when item selected
     useEffect(() => {
@@ -64,11 +85,9 @@ export default function InventoryPage() {
     });
 
     const lowStock = items.filter(i => totalStock(i) <= i.minStock);
-    const totalValue = items.reduce((s, i) => s + totalStock(i) * (i.unitCost || 0), 0);
     const totalConsumed = logs.reduce((s, l) => s + l.qty, 0);
     const set = (k: string, v: string | number) => setForm(f => ({ ...f, [k]: v }));
 
-    // Aggregate: who consumed what? Group logs by technician
     const techBreakdown = logs.reduce<Record<string, { name: string; totalQty: number; items: Record<string, number> }>>((acc, l) => {
         if (!acc[l.technicianId]) acc[l.technicianId] = { name: l.technicianName, totalQty: 0, items: {} };
         acc[l.technicianId].totalQty += l.qty;
@@ -95,6 +114,52 @@ export default function InventoryPage() {
         else toast('error', 'Error al eliminar');
     };
 
+    const handleAssign = async () => {
+        if (!assignTechId || !assignItemId || assignQty <= 0) { toast('error', 'Completa todos los campos'); return; }
+        const res = await authFetch('/api/inventory/assign', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ technicianId: assignTechId, inventoryId: assignItemId, qty: assignQty }),
+        });
+        if (res.ok) { toast('success', 'Material asignado'); setAssignModal(false); setAssignTechId(''); setAssignItemId(''); setAssignQty(1); loadAssignments(); }
+        else toast('error', 'Error al asignar');
+    };
+
+    const handleRemoveAssignment = async (a: TechAssignment) => {
+        await authFetch('/api/inventory/remove-assignment', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ technicianId: a.technicianId, inventoryId: a.inventoryId }),
+        });
+        toast('success', 'Asignación eliminada');
+        loadAssignments();
+    };
+
+    const handleReturn = async (a: TechAssignment, returnQty: number) => {
+        if (returnQty <= 0 || returnQty > a.qty) { toast('error', `Cantidad inválida (máx ${a.qty})`); return; }
+        const res = await authFetch('/api/inventory/return', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ technicianId: a.technicianId, inventoryId: a.inventoryId, qty: returnQty }),
+        });
+        if (res.ok) {
+            const data = await res.json();
+            toast('success', data.message || 'Material devuelto');
+            loadAssignments();
+            refetch(); // refresh warehouse qty
+        } else toast('error', 'Error al devolver');
+    };
+
+    // Group assignments by technician for display
+    const assignmentsByTech = assignments.reduce<Record<string, { name: string; items: TechAssignment[] }>>((acc, a) => {
+        if (!acc[a.technicianId]) acc[a.technicianId] = { name: a.technicianName, items: [] };
+        acc[a.technicianId].items.push(a);
+        return acc;
+    }, {});
+
+    // Assignments for selected item
+    const itemAssignments = selectedItem ? assignments.filter(a => a.inventoryId === selectedItem.id) : [];
+
     return (
         <div style={{ display: 'flex', gap: 20, height: 'calc(100vh - 108px)' }}>
             {/* Main content */}
@@ -104,9 +169,14 @@ export default function InventoryPage() {
                         <h1 style={{ fontSize: 24, fontWeight: 700, letterSpacing: '-0.02em' }}>Inventario</h1>
                         <p style={{ fontSize: 14, color: 'var(--color-geo-text-muted)', marginTop: 4 }}>{items.length} productos en catálogo</p>
                     </div>
-                    <button onClick={() => { setForm(emptyItem); setModal('create'); }} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 20px', borderRadius: 10, border: 'none', fontSize: 13, fontWeight: 600, background: 'var(--color-geo-primary)', color: '#fff', cursor: 'pointer' }}>
-                        <Plus size={16} /> Nuevo Producto
-                    </button>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                        <button onClick={() => setAssignModal(true)} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 20px', borderRadius: 10, border: '1px solid rgba(129,140,248,0.3)', fontSize: 13, fontWeight: 600, background: 'rgba(129,140,248,0.08)', color: '#818cf8', cursor: 'pointer' }}>
+                            <UserPlus size={16} /> Asignar a Técnico
+                        </button>
+                        <button onClick={() => { setForm(emptyItem); setModal('create'); }} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 20px', borderRadius: 10, border: 'none', fontSize: 13, fontWeight: 600, background: 'var(--color-geo-primary)', color: '#fff', cursor: 'pointer' }}>
+                            <Plus size={16} /> Nuevo Producto
+                        </button>
+                    </div>
                 </div>
 
                 {/* KPI strip */}
@@ -157,12 +227,14 @@ export default function InventoryPage() {
                             {filtered.map(item => {
                                 const total = totalStock(item);
                                 const isLow = total <= item.minStock;
+                                const techCount = assignments.filter(a => a.inventoryId === item.id).length;
                                 return (
                                     <tr key={item.id} style={{ cursor: 'pointer', background: selectedItem?.id === item.id ? 'rgba(59,130,246,0.06)' : undefined }} onClick={() => setSelectedItem(item)}>
                                         <td style={{ fontWeight: 600, fontSize: 12, color: 'var(--color-geo-text-dim)' }}>{item.sku}</td>
                                         <td style={{ fontWeight: 500, color: 'var(--color-geo-text)' }}>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                                                 {item.name}
+                                                {techCount > 0 && <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 6px', borderRadius: 5, background: 'rgba(129,140,248,0.15)', color: '#818cf8' }}>{techCount} <Users size={9} style={{ verticalAlign: -1 }} /></span>}
                                                 <ChevronRight size={12} style={{ color: 'var(--color-geo-text-dim)' }} />
                                             </div>
                                         </td>
@@ -178,6 +250,7 @@ export default function InventoryPage() {
                                         <td style={{ fontWeight: 600 }}>${item.unitCost || 0}</td>
                                         <td>
                                             <div style={{ display: 'flex', gap: 4 }} onClick={e => e.stopPropagation()}>
+                                                <button onClick={() => { setAssignItemId(item.id); setAssignModal(true); }} title="Asignar" style={{ width: 28, height: 28, borderRadius: 6, border: 'none', background: 'rgba(129,140,248,0.08)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#818cf8' }}><UserPlus size={13} /></button>
                                                 <button onClick={() => { setForm(item); setModal('edit'); }} style={{ width: 28, height: 28, borderRadius: 6, border: 'none', background: 'var(--color-geo-surface-2)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-geo-text-dim)' }}><Edit size={13} /></button>
                                                 <button onClick={() => setDeleteId(item.id)} style={{ width: 28, height: 28, borderRadius: 6, border: 'none', background: 'rgba(239,68,68,0.08)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#f87171' }}><Trash2 size={13} /></button>
                                             </div>
@@ -188,6 +261,69 @@ export default function InventoryPage() {
                         </tbody>
                     </table>
                 </div>
+
+                {/* Collapsible Consumption Summary */}
+                {logs.length > 0 && (
+                    <div className="glass-card" style={{ marginTop: 16 }}>
+                        <button onClick={() => setShowConsumption(!showConsumption)} style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 20px', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-geo-text)' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <History size={16} style={{ color: '#fbbf24' }} />
+                                <span style={{ fontSize: 14, fontWeight: 700 }}>Resumen de Consumo Global</span>
+                                <span style={{ fontSize: 12, color: 'var(--color-geo-text-dim)', fontWeight: 500 }}>{logs.length} registros · {totalConsumed} unidades</span>
+                            </div>
+                            {showConsumption ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                        </button>
+                        {showConsumption && (
+                            <div style={{ padding: '0 20px 20px', display: 'flex', gap: 20 }}>
+                                {/* By technician */}
+                                <div style={{ flex: 1 }}>
+                                    <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-geo-text-dim)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
+                                        <User size={13} /> Por Técnico
+                                    </div>
+                                    {Object.entries(techBreakdown).map(([tid, data]) => (
+                                        <div key={tid} style={{ padding: '10px 12px', background: 'var(--color-geo-surface-2)', borderRadius: 8, marginBottom: 8, fontSize: 12 }}>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                                    <div style={{ width: 28, height: 28, borderRadius: 7, background: 'rgba(129,140,248,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 800, color: '#818cf8' }}>
+                                                        {data.name.split(' ').map(w => w[0]).join('').slice(0, 2)}
+                                                    </div>
+                                                    <span style={{ fontWeight: 700 }}>{data.name}</span>
+                                                </div>
+                                                <span style={{ fontWeight: 800, color: '#fbbf24' }}>{data.totalQty} uds</span>
+                                            </div>
+                                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                                                {Object.entries(data.items).map(([name, qty]) => (
+                                                    <span key={name} style={{ padding: '2px 8px', borderRadius: 5, fontSize: 10, fontWeight: 600, background: 'rgba(255,255,255,0.05)', color: 'var(--color-geo-text-muted)' }}>
+                                                        {name} ×{qty}
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                                {/* Recent log entries */}
+                                <div style={{ flex: 1 }}>
+                                    <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-geo-text-dim)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
+                                        <History size={13} /> Últimos Registros
+                                    </div>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 300, overflowY: 'auto' }}>
+                                        {logs.slice(0, 20).map(log => (
+                                            <div key={log.id} style={{ padding: '8px 10px', background: 'var(--color-geo-surface-2)', borderRadius: 8, fontSize: 11 }}>
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>
+                                                    <span style={{ fontWeight: 700 }}>{log.inventoryName} ×{log.qty}</span>
+                                                    <span style={{ fontSize: 10, color: 'var(--color-geo-text-dim)' }}>{new Date(log.consumedAt).toLocaleString('es-MX', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
+                                                </div>
+                                                <div style={{ color: 'var(--color-geo-text-dim)' }}>
+                                                    {log.orderId} · {log.technicianName}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                )}
             </div>
 
             {/* Detail / Logs Panel */}
@@ -213,6 +349,52 @@ export default function InventoryPage() {
                                 <div style={{ fontSize: 10, color: 'var(--color-geo-text-dim)', fontWeight: 600, textTransform: 'uppercase' }}>{s.label}</div>
                             </div>
                         ))}
+                    </div>
+
+                    {/* Assigned To section */}
+                    <div>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, fontWeight: 700, color: 'var(--color-geo-text-dim)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                <Users size={13} /> Asignado a Técnicos
+                            </div>
+                            <button onClick={() => { setAssignItemId(selectedItem.id); setAssignModal(true); }} style={{ fontSize: 10, fontWeight: 700, padding: '3px 8px', borderRadius: 5, border: '1px solid rgba(129,140,248,0.3)', background: 'rgba(129,140,248,0.08)', color: '#818cf8', cursor: 'pointer' }}>+ Asignar</button>
+                        </div>
+                        {itemAssignments.length === 0 ? (
+                            <div style={{ textAlign: 'center', color: 'var(--color-geo-text-dim)', fontSize: 12, padding: 10 }}>No asignado a ningún técnico</div>
+                        ) : (
+                            itemAssignments.map(a => (
+                                <div key={a.id} style={{ padding: '8px 10px', background: 'var(--color-geo-surface-2)', borderRadius: 8, marginBottom: 6, fontSize: 13 }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                            <div style={{ width: 28, height: 28, borderRadius: 7, background: 'rgba(129,140,248,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 800, color: '#818cf8' }}>
+                                                {a.technicianName.split(' ').map(w => w[0]).join('').slice(0, 2)}
+                                            </div>
+                                            <span style={{ fontWeight: 600 }}>{a.technicianName}</span>
+                                        </div>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                            <span style={{ fontWeight: 800, color: a.qty <= 2 ? '#f87171' : '#34d399' }}>{a.qty} {a.unit}</span>
+                                            <button onClick={() => handleRemoveAssignment(a)} title="Quitar asignación" style={{ width: 20, height: 20, borderRadius: 5, border: 'none', background: 'rgba(239,68,68,0.1)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#f87171', fontSize: 12 }}>×</button>
+                                        </div>
+                                    </div>
+                                    {/* Return to warehouse controls */}
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6 }}>
+                                        <button
+                                            onClick={() => handleReturn(a, 1)}
+                                            style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, padding: '5px 8px', borderRadius: 6, border: '1px solid rgba(251,191,36,0.3)', background: 'rgba(251,191,36,0.08)', color: '#fbbf24', cursor: 'pointer', fontSize: 10, fontWeight: 700 }}
+                                        >
+                                            <RotateCcw size={10} /> Devolver 1 al almacén
+                                        </button>
+                                        <button
+                                            onClick={() => handleReturn(a, a.qty)}
+                                            title="Devolver todo al almacén"
+                                            style={{ padding: '5px 8px', borderRadius: 6, border: '1px solid rgba(251,191,36,0.3)', background: 'rgba(251,191,36,0.08)', color: '#fbbf24', cursor: 'pointer', fontSize: 10, fontWeight: 700 }}
+                                        >
+                                            Todo ({a.qty})
+                                        </button>
+                                    </div>
+                                </div>
+                            ))
+                        )}
                     </div>
 
                     {/* Consumo por Técnico */}
@@ -242,7 +424,7 @@ export default function InventoryPage() {
                         })()}
                     </div>
 
-                    {/* Registro de Consumo (historial) */}
+                    {/* Historial de Consumo */}
                     <div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10, fontSize: 11, fontWeight: 700, color: 'var(--color-geo-text-dim)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                             <History size={13} /> Historial de Consumo
@@ -268,63 +450,6 @@ export default function InventoryPage() {
                 </div>
             )}
 
-            {/* Global Consumption Panel (when no item selected) */}
-            {!selectedItem && logs.length > 0 && (
-                <div className="glass-card animate-fade-in-up" style={{ width: 370, flexShrink: 0, padding: 24, overflow: 'auto', display: 'flex', flexDirection: 'column', gap: 16 }}>
-                    <div>
-                        <h3 style={{ fontSize: 15, fontWeight: 700 }}>Resumen de Consumo</h3>
-                        <p style={{ fontSize: 12, color: 'var(--color-geo-text-dim)', marginTop: 2 }}>{logs.length} registros · {totalConsumed} unidades totales</p>
-                    </div>
-
-                    {/* Breakdown by technician */}
-                    <div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10, fontSize: 11, fontWeight: 700, color: 'var(--color-geo-text-dim)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                            <User size={13} /> Por Técnico
-                        </div>
-                        {Object.entries(techBreakdown).map(([tid, data]) => (
-                            <div key={tid} style={{ padding: '10px 12px', background: 'var(--color-geo-surface-2)', borderRadius: 8, marginBottom: 8, fontSize: 12 }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                        <div style={{ width: 28, height: 28, borderRadius: 7, background: 'rgba(129,140,248,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 800, color: '#818cf8' }}>
-                                            {data.name.split(' ').map(w => w[0]).join('').slice(0, 2)}
-                                        </div>
-                                        <span style={{ fontWeight: 700 }}>{data.name}</span>
-                                    </div>
-                                    <span style={{ fontWeight: 800, color: '#fbbf24' }}>{data.totalQty} uds</span>
-                                </div>
-                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-                                    {Object.entries(data.items).map(([name, qty]) => (
-                                        <span key={name} style={{ padding: '2px 8px', borderRadius: 5, fontSize: 10, fontWeight: 600, background: 'rgba(255,255,255,0.05)', color: 'var(--color-geo-text-muted)' }}>
-                                            {name} ×{qty}
-                                        </span>
-                                    ))}
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-
-                    {/* Recent log entries */}
-                    <div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10, fontSize: 11, fontWeight: 700, color: 'var(--color-geo-text-dim)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                            <History size={13} /> Últimos Registros
-                        </div>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 300, overflowY: 'auto' }}>
-                            {logs.slice(0, 20).map(log => (
-                                <div key={log.id} style={{ padding: '8px 10px', background: 'var(--color-geo-surface-2)', borderRadius: 8, fontSize: 11 }}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>
-                                        <span style={{ fontWeight: 700 }}>{log.inventoryName} ×{log.qty}</span>
-                                        <span style={{ fontSize: 10, color: 'var(--color-geo-text-dim)' }}>{new Date(log.consumedAt).toLocaleString('es-MX', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
-                                    </div>
-                                    <div style={{ color: 'var(--color-geo-text-dim)' }}>
-                                        {log.orderId} · {log.technicianName}
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                </div>
-            )}
-
             {/* Create/Edit Modal */}
             <Modal open={!!modal} onClose={() => setModal(null)} title={modal === 'create' ? 'Nuevo Producto' : 'Editar Producto'} subtitle="Catálogo de inventario" footer={<><BtnSecondary onClick={() => setModal(null)}>Cancelar</BtnSecondary><BtnPrimary onClick={handleSave}>Guardar</BtnPrimary></>}>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 16px' }}>
@@ -341,6 +466,43 @@ export default function InventoryPage() {
                     <FormField label="Stock Mínimo (Alerta)"><input className="geo-input" type="number" style={{ width: '100%' }} value={form.minStock ?? 5} onChange={e => set('minStock', +e.target.value)} /></FormField>
                     <FormField label="Costo Unitario ($)"><input className="geo-input" type="number" step="0.01" style={{ width: '100%' }} value={form.unitCost ?? 0} onChange={e => set('unitCost', +e.target.value)} /></FormField>
                 </div>
+            </Modal>
+
+            {/* Assign Modal */}
+            <Modal open={assignModal} onClose={() => { setAssignModal(false); setAssignTechId(''); setAssignItemId(''); setAssignQty(1); }} title="Asignar Material a Técnico" subtitle="El técnico verá este material en su inventario" footer={<><BtnSecondary onClick={() => { setAssignModal(false); setAssignTechId(''); setAssignItemId(''); setAssignQty(1); }}>Cancelar</BtnSecondary><BtnPrimary onClick={handleAssign}>Asignar</BtnPrimary></>}>
+                <FormField label="Técnico">
+                    <select className="geo-input" style={{ width: '100%' }} value={assignTechId} onChange={e => setAssignTechId(e.target.value)}>
+                        <option value="">Seleccionar técnico...</option>
+                        {techs.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                    </select>
+                </FormField>
+                <FormField label="Producto">
+                    <select className="geo-input" style={{ width: '100%' }} value={assignItemId} onChange={e => setAssignItemId(e.target.value)}>
+                        <option value="">Seleccionar producto...</option>
+                        {items.map(i => <option key={i.id} value={i.id}>{i.name} ({i.sku})</option>)}
+                    </select>
+                </FormField>
+                <FormField label="Cantidad a agregar">
+                    <input className="geo-input" type="number" min="1" style={{ width: '100%' }} value={assignQty} onChange={e => setAssignQty(+e.target.value)} />
+                    <div style={{ fontSize: 10, color: 'var(--color-geo-text-dim)', marginTop: 4 }}>Se suma al material que ya tenga asignado</div>
+                </FormField>
+
+                {/* Current assignments for selected tech */}
+                {assignTechId && (() => {
+                    const techAssigns = assignments.filter(a => a.technicianId === assignTechId);
+                    if (techAssigns.length === 0) return null;
+                    return (
+                        <div style={{ marginTop: 12, padding: '12px 16px', background: 'var(--color-geo-surface-2)', borderRadius: 10 }}>
+                            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-geo-text-dim)', textTransform: 'uppercase', marginBottom: 8 }}>Material actual asignado</div>
+                            {techAssigns.map(a => (
+                                <div key={a.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: 12 }}>
+                                    <span>{a.inventoryName}</span>
+                                    <span style={{ fontWeight: 700, color: '#818cf8' }}>{a.qty} {a.unit}</span>
+                                </div>
+                            ))}
+                        </div>
+                    );
+                })()}
             </Modal>
 
             <ConfirmDialog open={!!deleteId} onClose={() => setDeleteId(null)} onConfirm={() => { if (deleteId) handleDelete(deleteId); setDeleteId(null); }} message="Este producto será eliminado permanentemente del catálogo." confirmText="Eliminar" />

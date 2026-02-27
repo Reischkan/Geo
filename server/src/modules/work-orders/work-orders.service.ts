@@ -7,6 +7,7 @@ import { InventoryItem } from '../../entities/inventory-item.entity';
 import { MaterialLog } from '../../entities/material-log.entity';
 import { Technician } from '../../entities/technician.entity';
 import { User } from '../../entities/user.entity';
+import { TechInventory } from '../../entities/tech-inventory.entity';
 
 @Injectable()
 export class WorkOrdersService {
@@ -17,6 +18,7 @@ export class WorkOrdersService {
         @InjectRepository(MaterialLog) private readonly logRepo: Repository<MaterialLog>,
         @InjectRepository(Technician) private readonly techRepo: Repository<Technician>,
         @InjectRepository(User) private readonly userRepo: Repository<User>,
+        @InjectRepository(TechInventory) private readonly techInvRepo: Repository<TechInventory>,
     ) { }
 
     findAll(tenantId: string, status?: string, archived?: boolean) {
@@ -133,6 +135,13 @@ export class WorkOrdersService {
                 tenantId,
             });
             await this.logRepo.save(log);
+
+            // Deduct from technician's personal assignment
+            const techAssign = await this.techInvRepo.findOneBy({ technicianId, inventoryId: mat.inventoryId, tenantId });
+            if (techAssign) {
+                techAssign.qty = Math.max(0, techAssign.qty - mat.qty);
+                await this.techInvRepo.save(techAssign);
+            }
         }
 
         return order;

@@ -17,6 +17,7 @@ import TechHomePage from './pages/tech/TechHomePage';
 import TechOrdersPage from './pages/tech/TechOrdersPage';
 import TechOrderDetailPage from './pages/tech/TechOrderDetailPage';
 import TechProfilePage from './pages/tech/TechProfilePage';
+import TechInventoryPage from './pages/tech/TechInventoryPage';
 
 function AuthGuard({ children }: { children: React.ReactNode }) {
   const { token, loading } = useAuth();
@@ -64,6 +65,7 @@ function AppRoutes() {
         <Route path="/tech" element={<TechHomePage />} />
         <Route path="/tech/ordenes" element={<TechOrdersPage />} />
         <Route path="/tech/ordenes/:id" element={<TechOrderDetailPage />} />
+        <Route path="/tech/inventario" element={<TechInventoryPage />} />
         <Route path="/tech/perfil" element={<TechProfilePage />} />
       </Route>
     </Routes>
