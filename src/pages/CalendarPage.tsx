@@ -5,6 +5,8 @@ import { authFetch } from '../hooks/authFetch';
 import { useToast } from '../components/Toast';
 import Modal, { FormField, BtnPrimary, BtnSecondary } from '../components/Modal';
 import { technicians as fallbackTechs } from '../data/mock';
+import { useAuth } from '../contexts/AuthContext';
+import { getDefaultCoordinates } from '../utils/geo-defaults';
 
 interface Tech { id: string; name: string; }
 interface WorkOrder {
@@ -36,6 +38,8 @@ export default function CalendarPage() {
     const { data: orders, refetch } = useApi<WorkOrder[]>('/api/work-orders', []);
     const { data: techs } = useApi<Tech[]>('/api/technicians', fallbackTechs as any);
     const { toast } = useToast();
+    const { tenant } = useAuth();
+    const defaultCoords = useMemo(() => getDefaultCoordinates(tenant?.id), [tenant?.id]);
 
     // Modals
     const [showCreate, setShowCreate] = useState<number | null>(null);
@@ -113,8 +117,8 @@ export default function CalendarPage() {
                 endDate: '',
                 estimatedDuration: '2h',
                 description: `Sesión programada a las ${createForm.time}`,
-                lat: 19.4326,
-                lng: -99.1332,
+                lat: defaultCoords.lat,
+                lng: defaultCoords.lng,
             }),
         });
         if (res.ok) {
@@ -432,10 +436,10 @@ export default function CalendarPage() {
                         </select>
                     </FormField>
                     <FormField label="Latitud">
-                        <input className="geo-input" type="number" step="0.0001" style={{ width: '100%' }} value={editForm.lat ?? 19.4326} onChange={e => setNum('lat', e.target.value)} />
+                        <input className="geo-input" type="number" step="0.0001" style={{ width: '100%' }} value={editForm.lat ?? defaultCoords.lat} onChange={e => setNum('lat', e.target.value)} />
                     </FormField>
                     <FormField label="Longitud">
-                        <input className="geo-input" type="number" step="0.0001" style={{ width: '100%' }} value={editForm.lng ?? -99.1332} onChange={e => setNum('lng', e.target.value)} />
+                        <input className="geo-input" type="number" step="0.0001" style={{ width: '100%' }} value={editForm.lng ?? defaultCoords.lng} onChange={e => setNum('lng', e.target.value)} />
                     </FormField>
                 </div>
                 <FormField label="Descripción">

@@ -1,10 +1,12 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Search, Filter, ChevronDown, Plus, Edit, Archive, Calendar, Clock, MapPin, MessageSquare, Send } from 'lucide-react';
 import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import { useApi } from '../hooks/useApi';
 import { authFetch } from '../hooks/authFetch';
 import { useToast } from '../components/Toast';
+import { useAuth } from '../contexts/AuthContext';
+import { getDefaultCoordinates } from '../utils/geo-defaults';
 import Modal, { FormField, BtnPrimary, BtnSecondary, BtnDanger } from '../components/Modal';
 import ConfirmDialog from '../components/ConfirmDialog';
 import { workOrders as fallbackOrders, technicians as fallbackTechs } from '../data/mock';
@@ -52,18 +54,21 @@ const priorityColors: Record<string, { bg: string; color: string }> = {
     'baja': { bg: 'rgba(16,185,129,0.12)', color: '#34d399' },
 };
 
-const emptyOrder: Partial<WorkOrder> = {
+// NOTE: emptyOrder lat/lng are now set dynamically per tenant inside the component
+const emptyOrderBase: Partial<WorkOrder> = {
     title: '', client: '', clientAddress: '', technicianId: '', status: 'pendiente',
     priority: 'media', scheduledDate: '', endDate: '', estimatedDuration: '2h', description: '',
-    lat: 19.4326, lng: -99.1332,
 };
 
 export default function OrdersPage() {
-    const { data: orders, refetch } = useApi<WorkOrder[]>('/api/work-orders', fallbackOrders as any);
     const { data: techs } = useApi<Tech[]>('/api/technicians', fallbackTechs as any);
     const { toast } = useToast();
+    const { tenant } = useAuth();
+    const defaultCoords = useMemo(() => getDefaultCoordinates(tenant?.id), [tenant?.id]);
+    const emptyOrder: Partial<WorkOrder> = { ...emptyOrderBase, lat: defaultCoords.lat, lng: defaultCoords.lng };
 
     const [search, setSearch] = useState('');
+    const [debouncedSearch, setDebouncedSearch] = useState('');
     const [statusFilter, setStatusFilter] = useState('all');
     const [selected, setSelected] = useState<WorkOrder | null>(null);
     const [modal, setModal] = useState<'create' | 'edit' | null>(null);
@@ -75,6 +80,40 @@ export default function OrdersPage() {
     const [archivedOrders, setArchivedOrders] = useState<WorkOrder[]>([]);
     const [dateFrom, setDateFrom] = useState('');
     const [dateTo, setDateTo] = useState('');
+    const [page, setPage] = useState(1);
+    const PAGE_SIZE = 20;
+
+    // Debounce search input to avoid excessive API calls
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setDebouncedSearch(search);
+            setPage(1); // reset to page 1 on new search
+        }, 400);
+        return () => clearTimeout(timer);
+    }, [search]);
+
+    // Reset page when filters change
+    useEffect(() => { setPage(1); }, [statusFilter, dateFrom, dateTo]);
+
+    // Build paginated API URL
+    const ordersUrl = useMemo(() => {
+        const params = new URLSearchParams();
+        params.set('page', String(page));
+        params.set('limit', String(PAGE_SIZE));
+        if (statusFilter !== 'all') params.set('status', statusFilter);
+        if (debouncedSearch) params.set('search', debouncedSearch);
+        if (dateFrom) params.set('dateFrom', dateFrom);
+        if (dateTo) params.set('dateTo', dateTo);
+        return `/api/work-orders?${params.toString()}`;
+    }, [page, statusFilter, debouncedSearch, dateFrom, dateTo]);
+
+    const { data: paginatedResponse, refetch } = useApi<{ data: WorkOrder[]; meta: { total: number; page: number; totalPages: number } }>(
+        ordersUrl,
+        { data: fallbackOrders as any, meta: { total: 0, page: 1, totalPages: 1 } },
+    );
+
+    const orders = paginatedResponse?.data || [];
+    const meta = paginatedResponse?.meta || { total: 0, page: 1, totalPages: 1 };
 
     // Load archived orders when viewing archive
     useEffect(() => {
@@ -82,9 +121,12 @@ export default function OrdersPage() {
             authFetch('/api/work-orders?archived=true')
                 .then(r => r.json())
                 .then(setArchivedOrders)
-                .catch(() => setArchivedOrders([]));
+                .catch(() => {
+                    toast('error', 'Error de conexión al cargar órdenes archivadas');
+                    setArchivedOrders([]);
+                });
         }
-    }, [showArchived, orders]);
+    }, [showArchived, page]);
 
     // Load comments when an order is selected
     useEffect(() => {
@@ -92,30 +134,31 @@ export default function OrdersPage() {
         authFetch(`/api/work-orders/${selected.id}/comments`)
             .then(r => r.json())
             .then(setComments)
-            .catch(() => setComments([]));
+            .catch(() => {
+                toast('error', 'No se pudieron cargar los comentarios');
+                setComments([]);
+            });
     }, [selected?.id]);
 
     const handleAddComment = async () => {
         if (!newComment.trim() || !selected) return;
-        const res = await authFetch(`/api/work-orders/${selected.id}/comments`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ text: newComment.trim() }),
-        });
-        if (res.ok) {
-            const comment = await res.json();
-            setComments(prev => [...prev, comment]);
-            setNewComment('');
+        try {
+            const res = await authFetch(`/api/work-orders/${selected.id}/comments`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text: newComment.trim() }),
+            });
+            if (res.ok) {
+                const comment = await res.json();
+                setComments(prev => [...prev, comment]);
+                setNewComment('');
+            } else {
+                toast('error', 'No se pudo enviar el comentario');
+            }
+        } catch {
+            toast('error', 'Error de conexión al enviar comentario');
         }
     };
-
-    const filtered = orders.filter(o => {
-        const matchSearch = search === '' || o.title.toLowerCase().includes(search.toLowerCase()) || o.client.toLowerCase().includes(search.toLowerCase()) || o.id.toLowerCase().includes(search.toLowerCase());
-        const matchStatus = statusFilter === 'all' || o.status === statusFilter;
-        const matchDateFrom = !dateFrom || o.scheduledDate >= dateFrom;
-        const matchDateTo = !dateTo || o.scheduledDate <= dateTo;
-        return matchSearch && matchStatus && matchDateFrom && matchDateTo;
-    });
 
     const getTechName = (id: string) => techs.find(t => t.id === id)?.name || id;
     const set = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }));
@@ -158,7 +201,7 @@ export default function OrdersPage() {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
                     <div>
                         <h1 style={{ fontSize: 24, fontWeight: 700, letterSpacing: '-0.02em' }}>{showArchived ? 'Órdenes Archivadas' : 'Órdenes de Trabajo'}</h1>
-                        <p style={{ fontSize: 14, color: 'var(--color-geo-text-muted)', marginTop: 4 }}>{showArchived ? `${archivedOrders.length} archivadas` : `${filtered.length} órdenes`}</p>
+                        <p style={{ fontSize: 14, color: 'var(--color-geo-text-muted)', marginTop: 4 }}>{showArchived ? `${archivedOrders.length} archivadas` : `${meta.total} órdenes · Página ${meta.page} de ${meta.totalPages}`}</p>
                     </div>
                     <div style={{ display: 'flex', gap: 8 }}>
                         <button onClick={() => setShowArchived(!showArchived)} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 20px', borderRadius: 10, border: '1px solid var(--color-geo-border)', fontSize: 13, fontWeight: 600, background: showArchived ? 'rgba(139,92,246,0.15)' : 'var(--color-geo-surface-2)', color: showArchived ? '#a78bfa' : 'var(--color-geo-text-muted)', cursor: 'pointer', transition: 'all 0.2s' }}>
@@ -209,7 +252,7 @@ export default function OrdersPage() {
                         <table className="data-table">
                             <thead><tr><th>ID</th><th>Título</th><th>Cliente</th><th>Técnico</th><th>Estado</th><th>Prioridad</th><th>Fecha</th><th>Acciones</th></tr></thead>
                             <tbody>
-                                {filtered.map(o => {
+                                {orders.map(o => {
                                     const p = priorityColors[o.priority] || priorityColors['media'];
                                     return (
                                         <tr key={o.id} style={{ cursor: 'pointer', background: selected?.id === o.id ? 'rgba(59,130,246,0.06)' : undefined }} onClick={() => setSelected(o)}>
@@ -233,6 +276,43 @@ export default function OrdersPage() {
                                 })}
                             </tbody>
                         </table>
+                        {/* Pagination Controls */}
+                        {meta.totalPages > 1 && (
+                            <div style={{
+                                display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 12,
+                                padding: '12px 16px', borderTop: '1px solid var(--color-geo-border)',
+                            }}>
+                                <button
+                                    onClick={() => setPage(p => Math.max(1, p - 1))}
+                                    disabled={page <= 1}
+                                    style={{
+                                        padding: '6px 16px', borderRadius: 8, border: '1px solid var(--color-geo-border)',
+                                        background: page <= 1 ? 'var(--color-geo-surface-2)' : 'var(--color-geo-primary)',
+                                        color: page <= 1 ? 'var(--color-geo-text-dim)' : '#fff',
+                                        fontSize: 12, fontWeight: 600, cursor: page <= 1 ? 'default' : 'pointer',
+                                        transition: 'all 0.2s',
+                                    }}
+                                >
+                                    ← Anterior
+                                </button>
+                                <span style={{ fontSize: 12, color: 'var(--color-geo-text-muted)', fontWeight: 500 }}>
+                                    Página {meta.page} de {meta.totalPages}
+                                </span>
+                                <button
+                                    onClick={() => setPage(p => Math.min(meta.totalPages, p + 1))}
+                                    disabled={page >= meta.totalPages}
+                                    style={{
+                                        padding: '6px 16px', borderRadius: 8, border: '1px solid var(--color-geo-border)',
+                                        background: page >= meta.totalPages ? 'var(--color-geo-surface-2)' : 'var(--color-geo-primary)',
+                                        color: page >= meta.totalPages ? 'var(--color-geo-text-dim)' : '#fff',
+                                        fontSize: 12, fontWeight: 600, cursor: page >= meta.totalPages ? 'default' : 'pointer',
+                                        transition: 'all 0.2s',
+                                    }}
+                                >
+                                    Siguiente →
+                                </button>
+                            </div>
+                        )}
                     </div>
                 )}
 

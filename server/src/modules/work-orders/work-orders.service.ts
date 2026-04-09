@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource, Repository, ILike, LessThanOrEqual, MoreThanOrEqual, FindOptionsWhere } from 'typeorm';
 import { WorkOrder } from '../../entities/work-order.entity';
 import { OrderComment } from '../../entities/order-comment.entity';
 import { InventoryItem } from '../../entities/inventory-item.entity';
@@ -22,10 +22,54 @@ export class WorkOrdersService {
         private readonly dataSource: DataSource,
     ) { }
 
-    findAll(tenantId: string, status?: string, archived?: boolean) {
-        const where: any = { tenantId, archived: archived ?? false };
+    async findAll(
+        tenantId: string,
+        opts?: { status?: string; archived?: boolean; page?: number; limit?: number; search?: string; dateFrom?: string; dateTo?: string },
+    ) {
+        const { status, archived, page, limit, search, dateFrom, dateTo } = opts || {};
+        const where: FindOptionsWhere<WorkOrder> = { tenantId, archived: archived ?? false };
         if (status && status !== 'all') where.status = status;
-        return this.repo.find({ where });
+
+        // Build a query builder for complex search + date filtering
+        const qb = this.repo.createQueryBuilder('wo')
+            .where('wo.tenantId = :tenantId', { tenantId })
+            .andWhere('wo.archived = :archived', { archived: archived ?? false });
+
+        if (status && status !== 'all') {
+            qb.andWhere('wo.status = :status', { status });
+        }
+
+        if (search) {
+            qb.andWhere(
+                '(LOWER(wo.id) LIKE :search OR LOWER(wo.title) LIKE :search OR LOWER(wo.client) LIKE :search)',
+                { search: `%${search.toLowerCase()}%` },
+            );
+        }
+
+        if (dateFrom) {
+            qb.andWhere('wo.scheduledDate >= :dateFrom', { dateFrom });
+        }
+        if (dateTo) {
+            qb.andWhere('wo.scheduledDate <= :dateTo', { dateTo });
+        }
+
+        qb.orderBy('wo.scheduledDate', 'DESC');
+
+        // If pagination params provided, return paginated response
+        if (page && limit) {
+            const safePage = Math.max(1, page);
+            const safeLimit = Math.min(100, Math.max(1, limit));
+            qb.skip((safePage - 1) * safeLimit).take(safeLimit);
+
+            const [data, total] = await qb.getManyAndCount();
+            return {
+                data,
+                meta: { total, page: safePage, limit: safeLimit, totalPages: Math.ceil(total / safeLimit) },
+            };
+        }
+
+        // No pagination — return plain array (backward compat for tech views)
+        return qb.getMany();
     }
 
     async findOne(id: string, tenantId: string) {
@@ -132,22 +176,44 @@ export class WorkOrdersService {
                 }
             }
 
-            // BUG-03: Pre-validate ALL materials before making any mutations
+            // BUG-03 + BUG-01 FIX: Pre-validate ALL materials against technician's personal inventory
             const insufficientItems: string[] = [];
+            const missingAssignments: string[] = [];
             for (const mat of materials) {
                 if (!mat.inventoryId || mat.qty <= 0) {
                     throw new BadRequestException(`Material inválido: inventoryId=${mat.inventoryId}, qty=${mat.qty}`);
                 }
+
+                // Validate against technician's personal assignment (TechInventory), not just global pool
+                const techAssign = await manager.findOneBy(TechInventory, {
+                    technicianId, inventoryId: mat.inventoryId, tenantId,
+                });
+                if (!techAssign) {
+                    missingAssignments.push(
+                        `${mat.name || mat.inventoryId}: no está asignado al técnico`
+                    );
+                } else if (techAssign.qty < mat.qty) {
+                    insufficientItems.push(
+                        `${mat.name || mat.inventoryId}: solicitado ${mat.qty}, asignado ${techAssign.qty}`
+                    );
+                }
+
+                // Also validate global vehicleQty as a safety net
                 const item = await manager.findOneBy(InventoryItem, { id: mat.inventoryId, tenantId });
                 if (item && item.vehicleQty < mat.qty) {
                     insufficientItems.push(
-                        `${mat.name || mat.inventoryId}: solicitado ${mat.qty}, disponible ${item.vehicleQty}`
+                        `${mat.name || mat.inventoryId}: solicitado ${mat.qty}, disponible en vehículo ${item.vehicleQty}`
                     );
                 }
             }
+            if (missingAssignments.length > 0) {
+                throw new BadRequestException(
+                    `Materiales no asignados al técnico: ${missingAssignments.join('; ')}`
+                );
+            }
             if (insufficientItems.length > 0) {
                 throw new BadRequestException(
-                    `Stock insuficiente en vehículo para: ${insufficientItems.join('; ')}`
+                    `Stock insuficiente: ${insufficientItems.join('; ')}`
                 );
             }
 

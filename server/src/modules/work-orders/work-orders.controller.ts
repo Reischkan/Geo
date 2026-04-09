@@ -6,8 +6,25 @@ export class WorkOrdersController {
     constructor(private readonly svc: WorkOrdersService) { }
 
     @Get()
-    findAll(@Request() req: any, @Query('status') status?: string, @Query('archived') archived?: string) {
-        return this.svc.findAll(req.user.tenantId, status, archived === 'true' ? true : archived === 'false' ? false : undefined);
+    findAll(
+        @Request() req: any,
+        @Query('status') status?: string,
+        @Query('archived') archived?: string,
+        @Query('page') page?: string,
+        @Query('limit') limit?: string,
+        @Query('search') search?: string,
+        @Query('dateFrom') dateFrom?: string,
+        @Query('dateTo') dateTo?: string,
+    ) {
+        return this.svc.findAll(req.user.tenantId, {
+            status,
+            archived: archived === 'true' ? true : archived === 'false' ? false : undefined,
+            page: page ? parseInt(page, 10) : undefined,
+            limit: limit ? parseInt(limit, 10) : undefined,
+            search: search || undefined,
+            dateFrom: dateFrom || undefined,
+            dateTo: dateTo || undefined,
+        });
     }
 
     @Get('material-logs')

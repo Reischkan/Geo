@@ -5,6 +5,8 @@ import { authFetch } from '../hooks/authFetch';
 import { useToast } from '../components/Toast';
 import Modal, { FormField, BtnPrimary, BtnSecondary } from '../components/Modal';
 import ConfirmDialog from '../components/ConfirmDialog';
+import { useAuth } from '../contexts/AuthContext';
+import { getDefaultCoordinates } from '../utils/geo-defaults';
 
 interface Client {
     id: string; name: string; contactName: string; phone: string;
@@ -20,6 +22,8 @@ const emptyClient: Partial<Client> = {
 export default function ClientsPage() {
     const { data: clients, refetch } = useApi<Client[]>('/api/clients', []);
     const { toast } = useToast();
+    const { tenant } = useAuth();
+    const defaultCoords = getDefaultCoordinates(tenant?.id);
     const [search, setSearch] = useState('');
     const [modal, setModal] = useState<'create' | 'edit' | null>(null);
     const [form, setForm] = useState<Partial<Client>>(emptyClient);
@@ -65,7 +69,7 @@ export default function ClientsPage() {
                     </p>
                 </div>
                 <button
-                    onClick={() => { setForm(emptyClient); setModal('create'); }}
+                    onClick={() => { setForm({ ...emptyClient, lat: defaultCoords.lat, lng: defaultCoords.lng }); setModal('create'); }}
                     style={{
                         display: 'flex', alignItems: 'center', gap: 8, padding: '10px 20px',
                         borderRadius: 10, border: 'none', fontSize: 13, fontWeight: 600,

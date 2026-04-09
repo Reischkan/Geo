@@ -7,6 +7,8 @@ import Modal, { FormField, BtnPrimary, BtnSecondary } from '../components/Modal'
 import ConfirmDialog from '../components/ConfirmDialog';
 import { technicians as fallbackTechs } from '../data/mock';
 import type { Technician } from '../data/mock';
+import { useAuth } from '../contexts/AuthContext';
+import { getDefaultCoordinates } from '../utils/geo-defaults';
 
 interface TechStats {
     technicianId: string; completedOrders: number; totalOrders: number;
@@ -35,6 +37,8 @@ const emptyTech: TechForm = {
 export default function TechniciansPage() {
     const { data: technicians, refetch } = useApi<Technician[]>('/api/technicians', fallbackTechs);
     const { toast } = useToast();
+    const { tenant } = useAuth();
+    const defaultCoords = getDefaultCoordinates(tenant?.id);
     const [search, setSearch] = useState('');
     const [modal, setModal] = useState<'create' | 'edit' | null>(null);
     const [form, setForm] = useState<TechForm>(emptyTech);
@@ -110,7 +114,7 @@ export default function TechniciansPage() {
                         {technicians.length} registrados — {technicians.filter(t => t.status !== 'desconectado').length} activos
                     </p>
                 </div>
-                <button onClick={() => { setForm(emptyTech); setModal('create'); }} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 20px', borderRadius: 10, border: 'none', fontSize: 13, fontWeight: 600, background: 'var(--color-geo-primary)', color: '#fff', cursor: 'pointer' }}>
+                <button onClick={() => { setForm({ ...emptyTech, lat: defaultCoords.lat, lng: defaultCoords.lng }); setModal('create'); }} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 20px', borderRadius: 10, border: 'none', fontSize: 13, fontWeight: 600, background: 'var(--color-geo-primary)', color: '#fff', cursor: 'pointer' }}>
                     <Plus size={16} /> Nuevo Técnico
                 </button>
             </div>

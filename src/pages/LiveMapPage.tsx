@@ -5,6 +5,8 @@ import { Navigation, Phone, MapPin, Zap, ChevronDown, ClipboardList, Users, X } 
 import { useApi } from '../hooks/useApi';
 import { authFetch } from '../hooks/authFetch';
 import { useToast } from '../components/Toast';
+import { useAuth } from '../contexts/AuthContext';
+import { getDefaultCoordinates } from '../utils/geo-defaults';
 
 interface Tech {
     id: string; name: string; avatar: string; status: string;
@@ -93,6 +95,8 @@ export default function LiveMapPage() {
     const { data: techs, refetch } = useApi<Tech[]>('/api/technicians', [], 10000);
     const { data: orders, refetch: refetchOrders } = useApi<Order[]>('/api/work-orders', [], 10000);
     const { toast } = useToast();
+    const { tenant } = useAuth();
+    const defaultCoords = useMemo(() => getDefaultCoordinates(tenant?.id), [tenant?.id]);
     const [selected, setSelected] = useState<Tech | null>(null);
     const [statusFilter, setStatusFilter] = useState('all');
     const [showTechs, setShowTechs] = useState(true);
@@ -344,7 +348,7 @@ export default function LiveMapPage() {
                     </div>
                 )}
                 <MapContainer
-                    center={[19.41, -99.17]}
+                    center={[defaultCoords.lat, defaultCoords.lng]}
                     zoom={12}
                     style={{ width: '100%', height: '100%' }}
                     zoomControl={false}

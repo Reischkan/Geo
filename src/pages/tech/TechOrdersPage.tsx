@@ -52,13 +52,22 @@ export default function TechOrdersPage() {
     }, [tab, orders, myOrders, todayStr]);
 
     const handleAssign = async (orderId: string) => {
-        await authFetch(`/api/work-orders/${orderId}/assign`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ technicianId: techId }),
-        });
-        toast('success', 'Orden asignada');
-        refetch();
+        try {
+            const res = await authFetch(`/api/work-orders/${orderId}/assign`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ technicianId: techId }),
+            });
+            if (res.ok) {
+                toast('success', 'Orden asignada');
+                refetch();
+            } else {
+                const err = await res.json().catch(() => ({}));
+                toast('error', err.message || 'Error al asignar la orden');
+            }
+        } catch (error) {
+            toast('error', 'Error de red al asignar');
+        }
     };
 
     const tabs: { key: Tab; label: string }[] = [

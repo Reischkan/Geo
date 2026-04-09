@@ -5,6 +5,7 @@ import L from 'leaflet';
 import { useAuth } from '../../contexts/AuthContext';
 import { useApi } from '../../hooks/useApi';
 import { authFetch } from '../../hooks/authFetch';
+import { getDefaultCoordinates } from '../../utils/geo-defaults';
 import { Clock, MapPin, ChevronRight, Zap, Navigation } from 'lucide-react';
 
 interface WorkOrder {
@@ -56,11 +57,12 @@ function createTechMarker() {
 }
 
 export default function TechHomePage() {
-    const { user } = useAuth();
+    const { user, tenant } = useAuth();
     const techId = user?.technicianId || '';
     const { data: orders, refetch: refetchOrders } = useApi<WorkOrder[]>('/api/work-orders', []);
     const { data: techs, refetch: refetchTechs } = useApi<Tech[]>('/api/technicians', []);
     const navigate = useNavigate();
+    const defaultCoords = useMemo(() => getDefaultCoordinates(tenant?.id), [tenant?.id]);
 
     const tech = techs.find(t => t.id === techId);
     const currentStatus = techStatusLabels[tech?.status || 'disponible'] || techStatusLabels['disponible'];
@@ -79,8 +81,8 @@ export default function TechHomePage() {
     const mapCenter: [number, number] = useMemo(() => {
         if (tech?.lat && tech?.lng) return [tech.lat, tech.lng];
         if (mapOrders.length > 0) return [mapOrders[0].lat, mapOrders[0].lng];
-        return [19.43, -99.13]; // Default México City
-    }, [tech, mapOrders]);
+        return [defaultCoords.lat, defaultCoords.lng];
+    }, [tech, mapOrders, defaultCoords]);
 
     const [statusChanging, setStatusChanging] = useState(false);
     const cycleStatus = async () => {

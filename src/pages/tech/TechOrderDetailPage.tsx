@@ -5,7 +5,7 @@ import { useApi } from '../../hooks/useApi';
 import { authFetch } from '../../hooks/authFetch';
 import { useToast } from '../../components/Toast';
 import { sendLocation } from '../../hooks/sendLocation';
-import { ArrowLeft, MapPin, Clock, User, Calendar, Package, MessageSquare, Send, Navigation, CheckCircle, Play, Wrench, UserPlus, RotateCcw } from 'lucide-react';
+import { ArrowLeft, MapPin, Clock, User, Calendar, Package, MessageSquare, Send, Navigation, CheckCircle, Wrench, UserPlus, RotateCcw } from 'lucide-react';
 
 interface WorkOrder {
     id: string; title: string; client: string; clientAddress: string;
@@ -75,38 +75,67 @@ export default function TechOrderDetailPage() {
     const handleStatusChange = async () => {
         if (!flow) return;
         setSaving(true);
-        await authFetch(`/api/work-orders/${id}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ status: flow.next }),
-        });
-        toast('success', `Estado cambiado a: ${flow.next}`);
-        sendLocation();
-        refetch();
-        setSaving(false);
+        try {
+            const res = await authFetch(`/api/work-orders/${id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status: flow.next }),
+            });
+            if (res.ok) {
+                toast('success', `Estado cambiado a: ${flow.next}`);
+                sendLocation();
+                refetch();
+            } else {
+                const err = await res.json().catch(() => ({}));
+                toast('error', err.message || 'Error al cambiar estado');
+            }
+        } catch (error) {
+            toast('error', 'Error de red al cambiar estado');
+        } finally {
+            setSaving(false);
+        }
     };
 
     const handleReopen = async () => {
         setSaving(true);
-        await authFetch(`/api/work-orders/${id}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ status: 'en-servicio' }),
-        });
-        toast('success', 'Orden reabierta — estado: en servicio');
-        sendLocation();
-        refetch();
-        setSaving(false);
+        try {
+            const res = await authFetch(`/api/work-orders/${id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status: 'en-servicio' }),
+            });
+            if (res.ok) {
+                toast('success', 'Orden reabierta — estado: en servicio');
+                sendLocation();
+                refetch();
+            } else {
+                const err = await res.json().catch(() => ({}));
+                toast('error', err.message || 'Error al reabrir orden');
+            }
+        } catch (error) {
+            toast('error', 'Error de red al reabrir orden');
+        } finally {
+            setSaving(false);
+        }
     };
 
     const handleAssign = async () => {
-        await authFetch(`/api/work-orders/${id}/assign`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ technicianId: techId }),
-        });
-        toast('success', 'Orden asignada');
-        refetch();
+        try {
+            const res = await authFetch(`/api/work-orders/${id}/assign`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ technicianId: techId }),
+            });
+            if (res.ok) {
+                toast('success', 'Orden asignada');
+                refetch();
+            } else {
+                const err = await res.json().catch(() => ({}));
+                toast('error', err.message || 'Error al asignar la orden');
+            }
+        } catch (error) {
+            toast('error', 'Error de red al asignar');
+        }
     };
 
     const handleAddComment = async () => {
@@ -138,17 +167,27 @@ export default function TechOrderDetailPage() {
     const handleConsumeMaterials = async () => {
         if (selectedMaterials.length === 0) { toast('error', 'Selecciona al menos un material'); return; }
         setSaving(true);
-        await authFetch(`/api/work-orders/${id}/materials`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ materials: selectedMaterials }),
-        });
-        toast('success', 'Materiales registrados');
-        setSelectedMaterials([]);
-        setShowMaterials(false);
-        refetch();
-        refetchInventory();
-        setSaving(false);
+        try {
+            const res = await authFetch(`/api/work-orders/${id}/materials`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ materials: selectedMaterials }),
+            });
+            if (res.ok) {
+                toast('success', 'Materiales registrados');
+                setSelectedMaterials([]);
+                setShowMaterials(false);
+                refetch();
+                refetchInventory();
+            } else {
+                const err = await res.json().catch(() => ({}));
+                toast('error', err.message || 'Error al registrar materiales');
+            }
+        } catch (error) {
+            toast('error', 'Error de red al registrar materiales');
+        } finally {
+            setSaving(false);
+        }
     };
 
     return (
