@@ -127,6 +127,7 @@ export default function LiveMapPage() {
     const [statusFilter, setStatusFilter] = useState('all');
     const [showTechs, setShowTechs] = useState(true);
     const [showOrders, setShowOrders] = useState(true);
+    const [mapTheme, setMapTheme] = useState<'dark' | 'light'>('dark');
 
     const filtered = techs.filter(t => statusFilter === 'all' || t.status === statusFilter);
     const activeTechs = techs.filter(t => t.status !== 'desconectado');
@@ -373,6 +374,21 @@ export default function LiveMapPage() {
                         </button>
                     </div>
                 )}
+                {/* Map Theme Toggle */}
+                <button
+                    onClick={() => setMapTheme(t => t === 'dark' ? 'light' : 'dark')}
+                    style={{
+                        position: 'absolute', top: 12, right: 12, zIndex: 1000,
+                        background: mapTheme === 'dark' ? 'rgba(15,23,42,0.85)' : 'rgba(255,255,255,0.9)',
+                        backdropFilter: 'blur(12px)',
+                        borderRadius: 8, padding: '8px 12px', border: '1px solid rgba(148,163,184,0.2)',
+                        color: mapTheme === 'dark' ? '#94a3b8' : '#334155', fontSize: 11, fontWeight: 600, cursor: 'pointer',
+                        display: 'flex', alignItems: 'center', gap: 6,
+                    }}
+                >
+                    {mapTheme === 'dark' ? '🌙 Modo Oscuro' : '☀️ Modo Claro'}
+                </button>
+
                 <MapContainer
                     center={[defaultCoords.lat, defaultCoords.lng]}
                     zoom={12}
@@ -381,7 +397,7 @@ export default function LiveMapPage() {
                 >
                     <TileLayer
                         attribution='&copy; <a href="https://carto.com/">CARTO</a>'
-                        url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+                        url={`https://{s}.basemaps.cartocdn.com/${mapTheme}_all/{z}/{x}/{y}{r}.png`}
                     />
 
                     {/* ── TECHNICIAN MARKERS (status-aware) ── */}

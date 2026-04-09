@@ -85,6 +85,7 @@ export default function TechHomePage() {
     }, [tech, mapOrders, defaultCoords]);
 
     const [statusChanging, setStatusChanging] = useState(false);
+    const [mapTheme, setMapTheme] = useState<'dark' | 'light'>('dark');
     const cycleStatus = async () => {
         if (!tech) return;
         const cycle = ['disponible', 'en-ruta', 'en-servicio', 'disponible'];
@@ -147,8 +148,22 @@ export default function TechHomePage() {
                     </div>
                     <div style={{
                         borderRadius: 14, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.06)',
-                        height: 260,
+                        height: 260, position: 'relative'
                     }}>
+                        {/* Map Mode Toggle */}
+                        <button
+                            onClick={(e) => { e.stopPropagation(); setMapTheme(t => t === 'dark' ? 'light' : 'dark'); }}
+                            style={{
+                                position: 'absolute', top: 10, right: 10, zIndex: 1000,
+                                background: mapTheme === 'dark' ? 'rgba(15,23,42,0.85)' : 'rgba(255,255,255,0.9)', 
+                                backdropFilter: 'blur(12px)',
+                                borderRadius: 8, padding: '6px 10px', border: '1px solid rgba(148,163,184,0.2)',
+                                color: mapTheme === 'dark' ? '#94a3b8' : '#334155', fontSize: 11, fontWeight: 700, cursor: 'pointer',
+                                display: 'flex', alignItems: 'center', gap: 6,
+                            }}
+                        >
+                            {mapTheme === 'dark' ? '🌙 Oscuro' : '☀️ Claro'}
+                        </button>
                         <MapContainer
                             center={mapCenter}
                             zoom={13}
@@ -156,7 +171,7 @@ export default function TechHomePage() {
                             zoomControl={false}
                             attributionControl={false}
                         >
-                            <TileLayer url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" />
+                            <TileLayer url={`https://{s}.basemaps.cartocdn.com/${mapTheme}_all/{z}/{x}/{y}{r}.png`} />
 
                             {/* Technician position */}
                             {tech?.lat && tech?.lng && (
