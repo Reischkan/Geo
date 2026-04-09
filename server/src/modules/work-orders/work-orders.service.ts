@@ -41,7 +41,25 @@ export class WorkOrdersService {
 
     async update(id: string, data: Partial<WorkOrder>, tenantId: string) {
         await this.repo.update({ id, tenantId }, data);
-        return this.findOne(id, tenantId);
+        const order = await this.findOne(id, tenantId);
+
+        // Auto-sync linked technician status when order status changes
+        if (data.status && order.technicianId) {
+            const statusMap: Record<string, string> = {
+                'en-ruta': 'en-ruta',
+                'en-servicio': 'en-servicio',
+                'completada': 'disponible',
+            };
+            const newTechStatus = statusMap[data.status];
+            if (newTechStatus) {
+                await this.techRepo.update(
+                    { id: order.technicianId, tenantId },
+                    { status: newTechStatus },
+                );
+            }
+        }
+
+        return order;
     }
 
     async archive(id: string, tenantId: string) {

@@ -58,8 +58,8 @@ function createTechMarker() {
 export default function TechHomePage() {
     const { user } = useAuth();
     const techId = user?.technicianId || '';
-    const { data: orders } = useApi<WorkOrder[]>('/api/work-orders', []);
-    const { data: techs } = useApi<Tech[]>('/api/technicians', []);
+    const { data: orders, refetch: refetchOrders } = useApi<WorkOrder[]>('/api/work-orders', []);
+    const { data: techs, refetch: refetchTechs } = useApi<Tech[]>('/api/technicians', []);
     const navigate = useNavigate();
 
     const tech = techs.find(t => t.id === techId);
@@ -94,7 +94,8 @@ export default function TechHomePage() {
             body: JSON.stringify({ status: next }),
         });
         setStatusChanging(false);
-        window.location.reload();
+        refetchTechs();
+        refetchOrders();
     };
 
     const firstName = user?.name?.split(' ')[0] || 'Técnico';

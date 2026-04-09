@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Polyline } from 'react-leaflet';
 import L from 'leaflet';
-import { Navigation, Phone, MapPin, Zap, ChevronDown, ClipboardList, Users } from 'lucide-react';
+import { Navigation, Phone, MapPin, Zap, ChevronDown, ClipboardList, Users, X } from 'lucide-react';
 import { useApi } from '../hooks/useApi';
 import { authFetch } from '../hooks/authFetch';
 import { useToast } from '../components/Toast';
@@ -18,8 +18,8 @@ interface Order {
 
 const statusLabels: Record<string, string> = { 'en-ruta': 'En Ruta', 'en-servicio': 'En Servicio', 'disponible': 'Disponible', 'desconectado': 'Desconectado' };
 const statusColors: Record<string, string> = { 'en-ruta': '#3b82f6', 'en-servicio': '#10b981', 'disponible': '#f59e0b', 'desconectado': '#64748b' };
-const orderStatusLabels: Record<string, string> = { 'pendiente': 'Pendiente', 'en-progreso': 'En Progreso', 'completada': 'Completada', 'cancelada': 'Cancelada' };
-const orderStatusColors: Record<string, string> = { 'pendiente': '#f59e0b', 'en-progreso': '#3b82f6', 'completada': '#10b981', 'cancelada': '#ef4444' };
+const orderStatusLabels: Record<string, string> = { 'pendiente': 'Pendiente', 'en-progreso': 'En Progreso', 'en-ruta': 'En Ruta', 'en-servicio': 'En Servicio', 'completada': 'Completada', 'cancelada': 'Cancelada' };
+const orderStatusColors: Record<string, string> = { 'pendiente': '#f59e0b', 'en-progreso': '#3b82f6', 'en-ruta': '#8b5cf6', 'en-servicio': '#f97316', 'completada': '#10b981', 'cancelada': '#ef4444' };
 const priorityLabels: Record<string, string> = { 'urgente': 'Urgente', 'alta': 'Alta', 'media': 'Media', 'baja': 'Baja' };
 const priorityColors: Record<string, string> = { 'urgente': '#ef4444', 'alta': '#f87171', 'media': '#fbbf24', 'baja': '#34d399' };
 
@@ -90,8 +90,8 @@ if (typeof document !== 'undefined' && !document.getElementById('geo-map-animati
 /* ── Component ─────────────────────────────── */
 
 export default function LiveMapPage() {
-    const { data: techs, refetch } = useApi<Tech[]>('/api/technicians', []);
-    const { data: orders } = useApi<Order[]>('/api/work-orders', []);
+    const { data: techs, refetch } = useApi<Tech[]>('/api/technicians', [], 10000);
+    const { data: orders, refetch: refetchOrders } = useApi<Order[]>('/api/work-orders', [], 10000);
     const { toast } = useToast();
     const [selected, setSelected] = useState<Tech | null>(null);
     const [statusFilter, setStatusFilter] = useState('all');
@@ -101,15 +101,24 @@ export default function LiveMapPage() {
     const filtered = techs.filter(t => statusFilter === 'all' || t.status === statusFilter);
     const activeTechs = techs.filter(t => t.status !== 'desconectado');
     const activeOrders = orders.filter(o => o.status !== 'cancelada' && o.status !== 'completada');
+
+    // Map-visible techs: if a tech is selected, show only that tech; otherwise show all filtered
+    const mapTechs = selected ? techs.filter(t => t.id === selected.id) : filtered;
+    // Map-visible orders: if a tech is selected, show only their orders; otherwise show all active
+    const mapOrders = selected
+        ? orders.filter(o => o.technicianId === selected.id && o.status !== 'cancelada' && o.status !== 'completada')
+        : activeOrders;
     const getTechName = (id: string) => techs.find(t => t.id === id)?.name || id;
 
-    // Map each tech to their active order (en-progreso first, then pendiente)
+    // Map each tech to their active order (priority: en-servicio > en-ruta > en-progreso > pendiente)
     const techOrderMap = useMemo(() => {
         const map = new Map<string, Order>();
+        const activeStatuses = ['en-servicio', 'en-ruta', 'en-progreso', 'pendiente'];
         for (const tech of techs) {
-            const active = orders.find(o => o.technicianId === tech.id && o.status === 'en-progreso')
-                || orders.find(o => o.technicianId === tech.id && o.status === 'pendiente');
-            if (active) map.set(tech.id, active);
+            for (const st of activeStatuses) {
+                const order = orders.find(o => o.technicianId === tech.id && o.status === st);
+                if (order) { map.set(tech.id, order); break; }
+            }
         }
         return map;
     }, [techs, orders]);
@@ -135,6 +144,7 @@ export default function LiveMapPage() {
         if (res.ok) {
             toast('success', `Estado actualizado a "${statusLabels[newStatus]}"`);
             refetch();
+            refetchOrders();
             setSelected(s => s && s.id === techId ? { ...s, status: newStatus } : s);
         } else toast('error', 'Error al actualizar estado');
     };
@@ -198,7 +208,7 @@ export default function LiveMapPage() {
                                     padding: 14, cursor: 'pointer',
                                     borderColor: selected?.id === tech.id ? 'var(--color-geo-primary)' : undefined,
                                 }}
-                                onClick={() => setSelected(tech)}
+                                onClick={() => setSelected(s => s?.id === tech.id ? null : tech)}
                             >
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                                     <div style={{
@@ -262,12 +272,12 @@ export default function LiveMapPage() {
                     })}
 
                     {/* Orders list in sidebar */}
-                    {showOrders && activeOrders.length > 0 && (
+                    {showOrders && mapOrders.length > 0 && (
                         <>
                             <div style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--color-geo-text-dim)', padding: '8px 0 2px', marginTop: 4 }}>
-                                Órdenes Activas ({activeOrders.length})
+                                {selected ? `Órdenes de ${selected.name.split(' ')[0]}` : 'Órdenes Activas'} ({mapOrders.length})
                             </div>
-                            {activeOrders.map(order => (
+                            {mapOrders.map(order => (
                                 <div key={order.id} className="glass-card" style={{ padding: 12 }}>
                                     <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
                                         <div style={{
@@ -298,7 +308,41 @@ export default function LiveMapPage() {
             </div>
 
             {/* Map */}
-            <div className="glass-card" style={{ flex: 1, overflow: 'hidden', borderRadius: 16, padding: 0 }}>
+            <div className="glass-card" style={{ flex: 1, overflow: 'hidden', borderRadius: 16, padding: 0, position: 'relative' }}>
+                {/* Selected tech focus banner */}
+                {selected && (
+                    <div style={{
+                        position: 'absolute', top: 12, left: '50%', transform: 'translateX(-50%)', zIndex: 1000,
+                        background: 'rgba(15,23,42,0.9)', backdropFilter: 'blur(12px)',
+                        borderRadius: 10, padding: '8px 14px', border: `1px solid ${statusColors[selected.status]}40`,
+                        display: 'flex', alignItems: 'center', gap: 10, fontSize: 12, color: '#e2e8f0',
+                        boxShadow: `0 0 20px ${statusColors[selected.status]}15`,
+                    }}>
+                        <div style={{
+                            width: 26, height: 26, borderRadius: 7, background: statusColors[selected.status],
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            fontSize: 10, fontWeight: 800, color: '#fff',
+                        }}>
+                            {selected.avatar}
+                        </div>
+                        <div>
+                            <span style={{ fontWeight: 700 }}>{selected.name}</span>
+                            <span style={{ color: '#64748b', marginLeft: 6, fontSize: 11 }}>— {statusLabels[selected.status]}</span>
+                        </div>
+                        <button
+                            onClick={() => setSelected(null)}
+                            style={{
+                                width: 22, height: 22, borderRadius: 6, border: 'none',
+                                background: 'rgba(148,163,184,0.15)', color: '#94a3b8',
+                                cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                marginLeft: 4,
+                            }}
+                            title="Mostrar todos"
+                        >
+                            <X size={12} />
+                        </button>
+                    </div>
+                )}
                 <MapContainer
                     center={[19.41, -99.17]}
                     zoom={12}
@@ -311,7 +355,7 @@ export default function LiveMapPage() {
                     />
 
                     {/* ── TECHNICIAN MARKERS (status-aware) ── */}
-                    {showTechs && filtered.map(tech => {
+                    {showTechs && mapTechs.map(tech => {
                         const assignedOrder = techOrderMap.get(tech.id);
 
                         // EN-SERVICIO: fused marker at the ORDER location
@@ -397,11 +441,11 @@ export default function LiveMapPage() {
                     })}
 
                     {/* ── ROUTE LINES for en-ruta techs ── */}
-                    {showTechs && techs.filter(t => t.status === 'en-ruta').map(tech => {
+                    {showTechs && mapTechs.filter(t => t.status === 'en-ruta').map(tech => {
                         const order = techOrderMap.get(tech.id);
                         if (!order) return null;
-                        // Should this tech be visible given the filter?
-                        if (statusFilter !== 'all' && statusFilter !== 'en-ruta') return null;
+                        // Should this tech be visible given the status filter?
+                        if (!selected && statusFilter !== 'all' && statusFilter !== 'en-ruta') return null;
                         return (
                             <Polyline
                                 key={`route-${tech.id}`}
@@ -417,7 +461,10 @@ export default function LiveMapPage() {
                     })}
 
                     {/* ── WORK ORDER MARKERS (skip fused ones) ── */}
-                    {showOrders && orders.filter(o => o.status !== 'cancelada' && !fusedOrderIds.has(o.id)).map(order => (
+                    {showOrders && (selected
+                        ? mapOrders.filter(o => !fusedOrderIds.has(o.id))
+                        : orders.filter(o => o.status !== 'cancelada' && !fusedOrderIds.has(o.id))
+                    ).map(order => (
                         <Marker
                             key={`order-${order.id}`}
                             position={[order.lat, order.lng]}

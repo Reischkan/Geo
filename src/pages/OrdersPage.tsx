@@ -40,6 +40,8 @@ interface OrderComment { id: string; orderId: string; authorId: string; authorNa
 const statusMap: Record<string, { label: string; cls: string }> = {
     'pendiente': { label: 'Pendiente', cls: 'badge-pending' },
     'en-progreso': { label: 'En Progreso', cls: 'badge-progress' },
+    'en-ruta': { label: 'En Ruta', cls: 'badge-progress' },
+    'en-servicio': { label: 'En Servicio', cls: 'badge-progress' },
     'completada': { label: 'Completada', cls: 'badge-completed' },
     'cancelada': { label: 'Cancelada', cls: 'badge-cancelled' },
 };
@@ -182,6 +184,8 @@ export default function OrdersPage() {
                                 <option value="all">Todos</option>
                                 <option value="pendiente">Pendiente</option>
                                 <option value="en-progreso">En Progreso</option>
+                                <option value="en-ruta">En Ruta</option>
+                                <option value="en-servicio">En Servicio</option>
                                 <option value="completada">Completada</option>
                                 <option value="cancelada">Cancelada</option>
                             </select>
@@ -365,7 +369,7 @@ export default function OrdersPage() {
                     </FormField>
                     <FormField label="Estado">
                         <select className="geo-input" style={{ width: '100%', appearance: 'none' }} value={form.status || 'pendiente'} onChange={e => set('status', e.target.value)}>
-                            <option value="pendiente">Pendiente</option><option value="en-progreso">En Progreso</option><option value="completada">Completada</option><option value="cancelada">Cancelada</option>
+                            <option value="pendiente">Pendiente</option><option value="en-progreso">En Progreso</option><option value="en-ruta">En Ruta</option><option value="en-servicio">En Servicio</option><option value="completada">Completada</option><option value="cancelada">Cancelada</option>
                         </select>
                     </FormField>
                 </div>

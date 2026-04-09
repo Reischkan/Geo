@@ -1,10 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 
 /**
  * Custom hook to fetch data from the GeoField backend API.
  * Sends JWT token from localStorage. Falls back to provided default data if fetch fails.
+ * @param pollInterval — optional polling interval in milliseconds for auto-refresh
  */
-export function useApi<T>(url: string, fallback: T): { data: T; loading: boolean; error: string | null; refetch: () => void } {
+export function useApi<T>(url: string, fallback: T, pollInterval?: number): { data: T; loading: boolean; error: string | null; refetch: () => void } {
     const [data, setData] = useState<T>(fallback);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -46,5 +47,16 @@ export function useApi<T>(url: string, fallback: T): { data: T; loading: boolean
         return () => { cancelled = true; };
     }, [url, trigger]);
 
-    return { data, loading, error, refetch: () => setTrigger(t => t + 1) };
+    // Polling: auto-refetch at the given interval
+    const refetch = useCallback(() => setTrigger(t => t + 1), []);
+    const refetchRef = useRef(refetch);
+    refetchRef.current = refetch;
+
+    useEffect(() => {
+        if (!pollInterval || pollInterval <= 0) return;
+        const id = setInterval(() => refetchRef.current(), pollInterval);
+        return () => clearInterval(id);
+    }, [pollInterval]);
+
+    return { data, loading, error, refetch };
 }
