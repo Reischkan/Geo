@@ -77,12 +77,14 @@ export class DashboardService {
         for (const o of orders) {
             const techName = techMap.get(o.technicianId) || o.technicianId;
             if (o.status === 'completada') {
+                // BUG-06 FIX: use scheduledDate as fallback when endDate is empty/null
+                const timeStr = isValidDateString(o.endDate) ? o.endDate : o.scheduledDate;
                 activities.push({
                     id: `act-${o.id}-complete`,
                     type: 'complete',
                     icon: 'check-circle',
                     message: `${techName} completó "${o.title}"`,
-                    time: o.endDate || o.scheduledDate,
+                    time: timeStr,
                 });
             }
             if (o.status === 'en-ruta') {
@@ -116,9 +118,14 @@ export class DashboardService {
             });
         }
 
-        // Sort by time descending, take latest 15
-        activities.sort((a, b) => b.time.localeCompare(a.time));
-        return activities.slice(0, 15).map((a, i) => ({
+        // BUG-06 FIX: safe sort — handles empty/null time strings
+        activities.sort((a, b) => {
+            const timeA = isValidDateString(a.time) ? a.time : '1970-01-01';
+            const timeB = isValidDateString(b.time) ? b.time : '1970-01-01';
+            return timeB.localeCompare(timeA);
+        });
+
+        return activities.slice(0, 15).map(a => ({
             ...a,
             time: formatRelativeTime(a.time),
         }));
@@ -203,11 +210,26 @@ export class DashboardService {
     }
 }
 
-function formatRelativeTime(dateStr: string): string {
-    if (!dateStr) return '';
-    const now = new Date();
+/**
+ * BUG-06 FIX: Guard against empty, null, or invalid date strings.
+ * Returns true only if dateStr is a non-empty string that parses to a valid Date.
+ */
+function isValidDateString(dateStr: string | null | undefined): boolean {
+    if (!dateStr || dateStr.trim() === '') return false;
     const d = new Date(dateStr);
+    return !isNaN(d.getTime());
+}
+
+/**
+ * BUG-06 FIX: Safely formats a date string as a relative time label.
+ * Returns 'Fecha desconocida' instead of crashing on empty/invalid dates.
+ */
+function formatRelativeTime(dateStr: string | null | undefined): string {
+    if (!isValidDateString(dateStr)) return 'Fecha desconocida';
+    const now = new Date();
+    const d = new Date(dateStr!);
     const diffMs = now.getTime() - d.getTime();
+    if (diffMs < 0) return 'Próximamente';
     const diffMin = Math.floor(diffMs / 60000);
     if (diffMin < 1) return 'Ahora';
     if (diffMin < 60) return `Hace ${diffMin} min`;

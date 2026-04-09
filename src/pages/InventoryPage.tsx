@@ -126,13 +126,20 @@ export default function InventoryPage() {
     };
 
     const handleRemoveAssignment = async (a: TechAssignment) => {
-        await authFetch('/api/inventory/remove-assignment', {
+        const res = await authFetch('/api/inventory/remove-assignment', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ technicianId: a.technicianId, inventoryId: a.inventoryId }),
         });
-        toast('success', 'Asignación eliminada');
-        loadAssignments();
+        // BUG-08 FIX: only show success when server confirms the operation
+        if (res.ok) {
+            toast('success', 'Asignación eliminada y stock restaurado');
+            loadAssignments();
+            refetch(); // also refresh warehouse qty since stock was returned
+        } else {
+            const err = await res.json().catch(() => ({}));
+            toast('error', err.message || 'Error al eliminar asignación');
+        }
     };
 
     const handleReturn = async (a: TechAssignment, returnQty: number) => {

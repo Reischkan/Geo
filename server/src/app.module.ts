@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { Technician } from './entities/technician.entity';
 import { WorkOrder } from './entities/work-order.entity';
 import { Project } from './entities/project.entity';
@@ -23,6 +24,7 @@ import { ClientsModule } from './modules/clients/clients.module';
 import { AuditModule } from './modules/audit/audit.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { SeedService } from './seed.service';
+import { APP_GUARD } from '@nestjs/core';
 
 @Module({
     imports: [
@@ -33,6 +35,12 @@ import { SeedService } from './seed.service';
             synchronize: true,
         }),
         TypeOrmModule.forFeature([Technician, WorkOrder, Project, InventoryItem, CalendarEvent, ActivityFeedItem, Client, AuditLog, Tenant, User, OrderComment, MaterialLog, TechInventory]),
+        // SEC-04: Global throttle — 60 req/min default; login endpoint uses stricter @Throttle override
+        ThrottlerModule.forRoot([{
+            name: 'default',
+            ttl: 60000,   // 60 second window
+            limit: 60,    // 60 requests per window for general routes
+        }]),
         TechniciansModule,
         WorkOrdersModule,
         ProjectsModule,
@@ -43,6 +51,13 @@ import { SeedService } from './seed.service';
         AuditModule,
         AuthModule,
     ],
-    providers: [SeedService],
+    providers: [
+        SeedService,
+        // SEC-04: ThrottlerGuard registered globally so all routes are rate-limited
+        {
+            provide: APP_GUARD,
+            useClass: ThrottlerGuard,
+        },
+    ],
 })
 export class AppModule { }

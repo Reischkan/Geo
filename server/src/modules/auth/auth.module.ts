@@ -10,12 +10,15 @@ import { AuthController } from './auth.controller';
 import { JwtStrategy } from './jwt.strategy';
 import { JwtAuthGuard } from './jwt-auth.guard';
 
+// SEC-01: Load JWT secret from environment — never hardcode in source
+const JWT_SECRET = process.env.JWT_SECRET || 'geofield-dev-secret-change-in-prod';
+
 @Module({
     imports: [
         TypeOrmModule.forFeature([User, Tenant]),
         PassportModule,
         JwtModule.register({
-            secret: 'geofield-jwt-secret-2026',
+            secret: JWT_SECRET,
             signOptions: { expiresIn: '24h' },
         }),
     ],
@@ -23,6 +26,7 @@ import { JwtAuthGuard } from './jwt-auth.guard';
     providers: [
         AuthService,
         JwtStrategy,
+        // Global JWT guard — all routes require auth unless decorated with @Public()
         {
             provide: APP_GUARD,
             useClass: JwtAuthGuard,

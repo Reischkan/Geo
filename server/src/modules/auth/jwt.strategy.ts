@@ -10,13 +10,16 @@ export interface JwtPayload {
     technicianId?: string;
 }
 
+// SEC-01: Read JWT secret from environment variable consistently
+const JWT_SECRET = process.env.JWT_SECRET || 'geofield-dev-secret-change-in-prod';
+
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
     constructor() {
         super({
             jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
             ignoreExpiration: false,
-            secretOrKey: 'geofield-jwt-secret-2026',
+            secretOrKey: JWT_SECRET,
         });
     }
 
