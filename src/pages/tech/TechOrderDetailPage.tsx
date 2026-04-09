@@ -218,6 +218,16 @@ export default function TechOrderDetailPage() {
                 <InfoRow icon={<Clock size={14} />} label="Duración" value={order.estimatedDuration} />
             </div>
 
+            {order.lat && order.lng && (
+                <button
+                    className="tech-action-btn"
+                    onClick={() => window.open(`https://www.google.com/maps/search/?api=1&query=${order.lat},${order.lng}`, '_blank')}
+                    style={{ background: 'rgba(59,130,246,0.1)', color: '#60a5fa', border: '1px solid rgba(59,130,246,0.3)', marginTop: -6 }}
+                >
+                    <Navigation size={16} /> Abrir ubicación en Google Maps
+                </button>
+            )}
+
             {order.description && (
                 <div className="tech-card">
                     <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>Descripción</div>

@@ -81,6 +81,7 @@ export default function OrdersPage() {
     const [dateFrom, setDateFrom] = useState('');
     const [dateTo, setDateTo] = useState('');
     const [page, setPage] = useState(1);
+    const [mapTheme, setMapTheme] = useState<'dark' | 'light'>('dark');
     const PAGE_SIZE = 20;
 
     // Debounce search input to avoid excessive API calls
@@ -459,18 +460,47 @@ export default function OrdersPage() {
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, fontWeight: 700, color: 'var(--color-geo-text-dim)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                             <MapPin size={13} /> Ubicación
                         </div>
-                        <div style={{ fontSize: 11, color: 'var(--color-geo-text-muted)' }}>
-                            {(form.lat ?? 19.4326).toFixed(4)}, {(form.lng ?? -99.1332).toFixed(4)}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <input 
+                                className="geo-input" 
+                                type="number" 
+                                step="any"
+                                value={form.lat ?? 19.4326} 
+                                onChange={e => setNum('lat', e.target.value)}
+                                style={{ width: 90, fontSize: 11, padding: '4px 8px' }} 
+                            />
+                            <span style={{ color: 'var(--color-geo-text-muted)' }}>,</span>
+                            <input 
+                                className="geo-input" 
+                                type="number" 
+                                step="any"
+                                value={form.lng ?? -99.1332} 
+                                onChange={e => setNum('lng', e.target.value)}
+                                style={{ width: 90, fontSize: 11, padding: '4px 8px' }} 
+                            />
                         </div>
                     </div>
-                    <div style={{ height: 220, borderRadius: 12, overflow: 'hidden', border: '1px solid var(--color-geo-border)' }}>
+                    <div style={{ position: 'relative', height: 220, borderRadius: 12, overflow: 'hidden', border: '1px solid var(--color-geo-border)' }}>
+                        <button
+                            onClick={(e) => { e.preventDefault(); setMapTheme(t => t === 'dark' ? 'light' : 'dark'); }}
+                            style={{
+                                position: 'absolute', top: 8, right: 8, zIndex: 1000,
+                                background: mapTheme === 'dark' ? 'rgba(15,23,42,0.85)' : 'rgba(255,255,255,0.9)', 
+                                backdropFilter: 'blur(12px)',
+                                borderRadius: 6, padding: '4px 8px', border: '1px solid rgba(148,163,184,0.2)',
+                                color: mapTheme === 'dark' ? '#94a3b8' : '#334155', fontSize: 10, fontWeight: 700, cursor: 'pointer',
+                                display: 'flex', alignItems: 'center', gap: 4,
+                            }}
+                        >
+                            {mapTheme === 'dark' ? '🌙 Oscuro' : '☀️ Claro'}
+                        </button>
                         <MapContainer
                             center={[form.lat ?? 19.4326, form.lng ?? -99.1332]}
                             zoom={14}
                             style={{ height: '100%', width: '100%' }}
                             zoomControl={false}
                         >
-                            <TileLayer url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" />
+                            <TileLayer url={`https://{s}.basemaps.cartocdn.com/${mapTheme}_all/{z}/{x}/{y}{r}.png`} />
                             <Marker position={[form.lat ?? 19.4326, form.lng ?? -99.1332]} icon={pinIcon} />
                             <MapClickHandler onMove={(lat, lng) => setForm(f => ({ ...f, lat: Math.round(lat * 10000) / 10000, lng: Math.round(lng * 10000) / 10000 }))} />
                             <RecenterMap lat={form.lat ?? 19.4326} lng={form.lng ?? -99.1332} />

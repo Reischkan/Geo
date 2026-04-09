@@ -206,17 +206,26 @@ export default function TechHomePage() {
                                                         background: `${sc}25`, color: sc,
                                                     }}>{order.status.replace('-', ' ')}</span>
                                                 </div>
-                                                <button
-                                                    onClick={() => navigate(`/tech/ordenes/${order.id}`)}
-                                                    style={{
-                                                        marginTop: 8, width: '100%', padding: '6px 0',
-                                                        borderRadius: 6, border: 'none',
-                                                        background: '#818cf8', color: 'white',
-                                                        fontWeight: 700, fontSize: 12, cursor: 'pointer',
-                                                    }}
-                                                >
-                                                    Ver Detalle →
-                                                </button>
+                                                <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+                                                    <button
+                                                        onClick={(e) => { e.stopPropagation(); window.open(`https://www.google.com/maps/search/?api=1&query=${order.lat},${order.lng}`, '_blank'); }}
+                                                        style={{
+                                                            flex: 1, padding: '6px 0', borderRadius: 6, border: '1px solid rgba(129,140,248,0.3)',
+                                                            background: 'rgba(129,140,248,0.1)', color: '#818cf8', fontWeight: 700, fontSize: 11, cursor: 'pointer',
+                                                        }}
+                                                    >
+                                                        Maps ↗
+                                                    </button>
+                                                    <button
+                                                        onClick={() => navigate(`/tech/ordenes/${order.id}`)}
+                                                        style={{
+                                                            flex: 1.5, padding: '6px 0', borderRadius: 6, border: 'none',
+                                                            background: '#818cf8', color: 'white', fontWeight: 700, fontSize: 11, cursor: 'pointer',
+                                                        }}
+                                                    >
+                                                        Detalle →
+                                                    </button>
+                                                </div>
                                             </div>
                                         </Popup>
                                     </Marker>
