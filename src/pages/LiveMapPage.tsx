@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Polyline } from 'react-leaflet';
 import L from 'leaflet';
 import { Navigation, Phone, MapPin, Zap, ChevronDown, ClipboardList, Users, X } from 'lucide-react';
@@ -90,6 +90,32 @@ if (typeof document !== 'undefined' && !document.getElementById('geo-map-animati
 }
 
 /* ── Component ─────────────────────────────── */
+
+function RoutingPolyline({ start, end, options }: { start: [number, number], end: [number, number], options: any }) {
+    const [positions, setPositions] = useState<[number, number][]>([start, end]);
+
+    useEffect(() => {
+        let mounted = true;
+        const fetchRoute = async () => {
+            try {
+                // start and end are [lat, lng]. OSRM requires lng,lat
+                const url = `https://router.project-osrm.org/route/v1/driving/${start[1]},${start[0]};${end[1]},${end[0]}?overview=full&geometries=geojson`;
+                const res = await fetch(url);
+                const data = await res.json();
+                if (mounted && data.routes && data.routes[0] && data.routes[0].geometry && data.routes[0].geometry.coordinates) {
+                    const coords = data.routes[0].geometry.coordinates.map((c: [number, number]) => [c[1], c[0]]);
+                    setPositions(coords);
+                }
+            } catch (err) {
+                console.error('Failed to fetch OSRM route', err);
+            }
+        };
+        fetchRoute();
+        return () => { mounted = false; };
+    }, [start[0], start[1], end[0], end[1]]);
+
+    return <Polyline positions={positions} pathOptions={options} />;
+}
 
 export default function LiveMapPage() {
     const { data: techs, refetch } = useApi<Tech[]>('/api/technicians', [], 10000);
@@ -444,21 +470,22 @@ export default function LiveMapPage() {
                         );
                     })}
 
-                    {/* ── ROUTE LINES for en-ruta techs ── */}
+                    {/* ── ROUTE LINES for en-ruta techs (OSRM Real Routing) ── */}
                     {showTechs && mapTechs.filter(t => t.status === 'en-ruta').map(tech => {
                         const order = techOrderMap.get(tech.id);
                         if (!order) return null;
                         // Should this tech be visible given the status filter?
                         if (!selected && statusFilter !== 'all' && statusFilter !== 'en-ruta') return null;
                         return (
-                            <Polyline
+                            <RoutingPolyline
                                 key={`route-${tech.id}`}
-                                positions={[[tech.lat, tech.lng], [order.lat, order.lng]]}
-                                pathOptions={{
+                                start={[tech.lat, tech.lng]}
+                                end={[order.lat, order.lng]}
+                                options={{
                                     color: '#3b82f6',
-                                    weight: 3,
+                                    weight: 4,
                                     dashArray: '8, 8',
-                                    opacity: 0.7,
+                                    opacity: 0.8,
                                 }}
                             />
                         );
