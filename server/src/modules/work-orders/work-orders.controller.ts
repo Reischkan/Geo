@@ -63,8 +63,8 @@ export class WorkOrdersController {
     }
 
     @Post(':id/comments')
-    addComment(@Param('id') id: string, @Body() body: { text: string }, @Request() req: any) {
-        return this.svc.addComment(id, req.user.userId, req.user.email, body.text, req.user.tenantId);
+    addComment(@Param('id') id: string, @Body() body: { text: string; images?: string[] }, @Request() req: any) {
+        return this.svc.addComment(id, req.user.userId, req.user.email, body.text, req.user.tenantId, body.images);
     }
 
     // ── Materials consumption ──

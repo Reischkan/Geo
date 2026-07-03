@@ -368,3 +368,214 @@
     letter-spacing: 0.06em;
     margin-bottom: 10px;
 }
+
+/* ── Photo Attach Button ── */
+.tech-photo-btn {
+    width: 44px;
+    height: 44px;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: var(--color-geo-surface-1, #111827);
+    color: var(--color-geo-text-dim, #64748b);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    flex-shrink: 0;
+    position: relative;
+    overflow: hidden;
+}
+
+.tech-photo-btn:hover {
+    border-color: rgba(129, 140, 248, 0.4);
+    color: #818cf8;
+    background: rgba(129, 140, 248, 0.08);
+}
+
+.tech-photo-btn input[type="file"] {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+}
+
+.tech-photo-btn .tech-photo-count {
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #818cf8;
+    color: white;
+    font-size: 10px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* ── Photo Preview Strip ── */
+.tech-photo-preview {
+    display: flex;
+    gap: 8px;
+    padding: 8px 0 4px;
+    overflow-x: auto;
+    scrollbar-width: none;
+}
+
+.tech-photo-preview::-webkit-scrollbar {
+    display: none;
+}
+
+.tech-photo-preview-item {
+    position: relative;
+    width: 64px;
+    height: 64px;
+    border-radius: 10px;
+    overflow: hidden;
+    flex-shrink: 0;
+    border: 2px solid rgba(129, 140, 248, 0.3);
+    animation: tech-fade-in 0.2s ease-out;
+}
+
+.tech-photo-preview-item img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.tech-photo-preview-remove {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.7);
+    border: none;
+    color: white;
+    font-size: 12px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s;
+    line-height: 1;
+    padding: 0;
+}
+
+.tech-photo-preview-remove:hover {
+    background: #ef4444;
+}
+
+/* ── Comment Image Gallery ── */
+.tech-comment-images {
+    display: flex;
+    gap: 6px;
+    margin-top: 8px;
+    flex-wrap: wrap;
+}
+
+.tech-comment-img {
+    width: 80px;
+    height: 80px;
+    border-radius: 8px;
+    object-fit: cover;
+    cursor: pointer;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    transition: all 0.2s;
+}
+
+.tech-comment-img:hover {
+    border-color: rgba(129, 140, 248, 0.5);
+    transform: scale(1.05);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+}
+
+/* ── Lightbox Overlay ── */
+.tech-lightbox {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    background: rgba(0, 0, 0, 0.92);
+    backdrop-filter: blur(12px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    animation: tech-lightbox-in 0.25s ease-out;
+}
+
+@keyframes tech-lightbox-in {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+.tech-lightbox img {
+    max-width: 100%;
+    max-height: 90vh;
+    border-radius: 12px;
+    box-shadow: 0 8px 40px rgba(0, 0, 0, 0.6);
+    object-fit: contain;
+}
+
+.tech-lightbox-close {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.12);
+    border: none;
+    color: white;
+    font-size: 20px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s;
+    z-index: 10000;
+}
+
+.tech-lightbox-close:hover {
+    background: rgba(255, 255, 255, 0.25);
+}
+
+/* ── Sending indicator ── */
+.tech-sending-indicator {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: #818cf8;
+    padding: 4px 0;
+    animation: tech-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes tech-pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.5;
+    }
+}
+
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
+}

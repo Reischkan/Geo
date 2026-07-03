@@ -17,6 +17,9 @@ export class OrderComment {
     @Column()
     text: string;
 
+    @Column({ type: 'text', default: '[]' })
+    images: string;
+
     @Column()
     createdAt: string;
 

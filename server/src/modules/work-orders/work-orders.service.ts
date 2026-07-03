@@ -128,13 +128,16 @@ export class WorkOrdersService {
         return this.commentRepo.find({ where: { orderId, tenantId }, order: { createdAt: 'ASC' } });
     }
 
-    async addComment(orderId: string, authorId: string, authorName: string, text: string, tenantId: string) {
+    async addComment(orderId: string, authorId: string, authorName: string, text: string, tenantId: string, images?: string[]) {
+        // Limit to 3 images max
+        const safeImages = (images || []).slice(0, 3);
         const comment = this.commentRepo.create({
             id: `CMT-${Date.now()}`,
             orderId,
             authorId,
             authorName,
             text,
+            images: JSON.stringify(safeImages),
             createdAt: new Date().toISOString(),
             tenantId,
         });

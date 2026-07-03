@@ -5,7 +5,7 @@ import { useApi } from '../../hooks/useApi';
 import { authFetch } from '../../hooks/authFetch';
 import { useToast } from '../../components/Toast';
 import { sendLocation } from '../../hooks/sendLocation';
-import { ArrowLeft, MapPin, Clock, User, Calendar, Package, MessageSquare, Send, Navigation, CheckCircle, Wrench, UserPlus, RotateCcw } from 'lucide-react';
+import { ArrowLeft, MapPin, Clock, User, Calendar, Package, MessageSquare, Send, Navigation, CheckCircle, Wrench, UserPlus, RotateCcw, Camera, X, Loader } from 'lucide-react';
 
 interface WorkOrder {
     id: string; title: string; client: string; clientAddress: string;
@@ -17,7 +17,7 @@ interface InventoryItem {
     inventoryId: string; assignmentId: number; name: string; sku: string; category: string; qty: number; unit: string; unitCost: number;
 }
 interface Comment {
-    id: string; orderId: string; authorId: string; authorName: string; text: string; createdAt: string;
+    id: string; orderId: string; authorId: string; authorName: string; text: string; images?: string; createdAt: string;
 }
 
 const statusFlow: Record<string, { next: string; label: string; icon: any; color: string }> = {
@@ -51,6 +51,49 @@ export default function TechOrderDetailPage() {
     const [showMaterials, setShowMaterials] = useState(false);
     const [selectedMaterials, setSelectedMaterials] = useState<{ inventoryId: string; name: string; qty: number }[]>([]);
     const [saving, setSaving] = useState(false);
+    const [pendingPhotos, setPendingPhotos] = useState<string[]>([]);
+    const [lightboxImg, setLightboxImg] = useState<string | null>(null);
+    const [sendingComment, setSendingComment] = useState(false);
+
+    // Compress image via canvas — max 800px side, JPEG quality 0.6
+    const compressImage = (file: File): Promise<string> => {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const img = new Image();
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    const MAX = 800;
+                    let w = img.width, h = img.height;
+                    if (w > h) { if (w > MAX) { h = Math.round(h * MAX / w); w = MAX; } }
+                    else { if (h > MAX) { w = Math.round(w * MAX / h); h = MAX; } }
+                    canvas.width = w;
+                    canvas.height = h;
+                    const ctx = canvas.getContext('2d')!;
+                    ctx.drawImage(img, 0, 0, w, h);
+                    resolve(canvas.toDataURL('image/jpeg', 0.6));
+                };
+                img.onerror = reject;
+                img.src = e.target?.result as string;
+            };
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+        });
+    };
+
+    const handlePhotoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const files = Array.from(e.target.files || []);
+        if (files.length === 0) return;
+        const remaining = 3 - pendingPhotos.length;
+        const toProcess = files.slice(0, remaining);
+        const compressed = await Promise.all(toProcess.map(f => compressImage(f)));
+        setPendingPhotos(prev => [...prev, ...compressed].slice(0, 3));
+        e.target.value = ''; // reset input
+    };
+
+    const removePhoto = (idx: number) => {
+        setPendingPhotos(prev => prev.filter((_, i) => i !== idx));
+    };
 
     // Load comments
     useEffect(() => {
@@ -139,15 +182,26 @@ export default function TechOrderDetailPage() {
     };
 
     const handleAddComment = async () => {
-        if (!newComment.trim()) return;
-        const res = await authFetch(`/api/work-orders/${id}/comments`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ text: newComment.trim() }),
-        });
-        const comment = await res.json();
-        setComments(prev => [...prev, comment]);
-        setNewComment('');
+        if (!newComment.trim() && pendingPhotos.length === 0) return;
+        setSendingComment(true);
+        try {
+            const res = await authFetch(`/api/work-orders/${id}/comments`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    text: newComment.trim(),
+                    images: pendingPhotos.length > 0 ? pendingPhotos : undefined,
+                }),
+            });
+            const comment = await res.json();
+            setComments(prev => [...prev, comment]);
+            setNewComment('');
+            setPendingPhotos([]);
+        } catch {
+            // error silently
+        } finally {
+            setSendingComment(false);
+        }
     };
 
     const toggleMaterial = (item: InventoryItem) => {
@@ -355,15 +409,52 @@ export default function TechOrderDetailPage() {
                     <div style={{ textAlign: 'center', padding: 16, color: '#475569', fontSize: 13 }}>Sin comentarios aún</div>
                 )}
 
-                {comments.map(c => (
-                    <div key={c.id} className="tech-comment">
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <span className="tech-comment-author">{c.authorName}</span>
-                            <span className="tech-comment-time">{new Date(c.createdAt).toLocaleString('es-MX', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
+                {comments.map(c => {
+                    const imgs: string[] = (() => { try { return JSON.parse(c.images || '[]'); } catch { return []; } })();
+                    return (
+                        <div key={c.id} className="tech-comment">
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span className="tech-comment-author">{c.authorName}</span>
+                                <span className="tech-comment-time">{new Date(c.createdAt).toLocaleString('es-MX', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
+                            </div>
+                            {c.text && <div className="tech-comment-text">{c.text}</div>}
+                            {imgs.length > 0 && (
+                                <div className="tech-comment-images">
+                                    {imgs.map((src, i) => (
+                                        <img
+                                            key={i}
+                                            src={src}
+                                            alt={`Foto ${i + 1}`}
+                                            className="tech-comment-img"
+                                            onClick={() => setLightboxImg(src)}
+                                        />
+                                    ))}
+                                </div>
+                            )}
                         </div>
-                        <div className="tech-comment-text">{c.text}</div>
+                    );
+                })}
+
+                {/* Photo Preview */}
+                {pendingPhotos.length > 0 && (
+                    <div className="tech-photo-preview">
+                        {pendingPhotos.map((src, i) => (
+                            <div key={i} className="tech-photo-preview-item">
+                                <img src={src} alt={`Preview ${i + 1}`} />
+                                <button className="tech-photo-preview-remove" onClick={() => removePhoto(i)}>
+                                    <X size={12} />
+                                </button>
+                            </div>
+                        ))}
                     </div>
-                ))}
+                )}
+
+                {/* Sending indicator */}
+                {sendingComment && (
+                    <div className="tech-sending-indicator">
+                        <Loader size={14} style={{ animation: 'spin 1s linear infinite' }} /> Enviando{pendingPhotos.length > 0 ? ` con ${pendingPhotos.length} foto${pendingPhotos.length > 1 ? 's' : ''}` : ''}...
+                    </div>
+                )}
 
                 {/* New Comment */}
                 <div style={{ display: 'flex', gap: 8 }}>
@@ -374,14 +465,28 @@ export default function TechOrderDetailPage() {
                         onChange={e => setNewComment(e.target.value)}
                         onKeyDown={e => e.key === 'Enter' && handleAddComment()}
                         style={{ flex: 1 }}
+                        disabled={sendingComment}
                     />
+                    <div className="tech-photo-btn">
+                        <Camera size={18} />
+                        <input
+                            type="file"
+                            accept="image/*"
+                            multiple
+                            onChange={handlePhotoSelect}
+                            disabled={pendingPhotos.length >= 3 || sendingComment}
+                        />
+                        {pendingPhotos.length > 0 && (
+                            <span className="tech-photo-count">{pendingPhotos.length}</span>
+                        )}
+                    </div>
                     <button
                         onClick={handleAddComment}
-                        disabled={!newComment.trim()}
+                        disabled={(!newComment.trim() && pendingPhotos.length === 0) || sendingComment}
                         style={{
                             width: 44, height: 44, borderRadius: 10, border: 'none',
-                            background: newComment.trim() ? '#818cf8' : '#1e293b',
-                            color: 'white', cursor: newComment.trim() ? 'pointer' : 'default',
+                            background: (newComment.trim() || pendingPhotos.length > 0) && !sendingComment ? '#818cf8' : '#1e293b',
+                            color: 'white', cursor: (newComment.trim() || pendingPhotos.length > 0) && !sendingComment ? 'pointer' : 'default',
                             display: 'flex', alignItems: 'center', justifyContent: 'center',
                             transition: 'all 0.2s',
                         }}
@@ -390,6 +495,16 @@ export default function TechOrderDetailPage() {
                     </button>
                 </div>
             </div>
+
+            {/* Lightbox */}
+            {lightboxImg && (
+                <div className="tech-lightbox" onClick={() => setLightboxImg(null)}>
+                    <button className="tech-lightbox-close" onClick={() => setLightboxImg(null)}>
+                        <X size={20} />
+                    </button>
+                    <img src={lightboxImg} alt="Foto ampliada" onClick={e => e.stopPropagation()} />
+                </div>
+            )}
         </div>
     );
 }
